@@ -8,6 +8,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>GSSS - 日本株式プロフェッショナル分析</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.tailwindcss.com">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -40,12 +43,10 @@
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: #0A1628; }
         ::-webkit-scrollbar-thumb { background: #1E3050; border-radius: 2px; }
-        /* スマホ用タッチ最適化 */
         @media (max-width: 640px) {
             .analyzer-card { min-height: 80px; }
-            input, select, button { font-size: 16px !important; /* iOS zoom防止 */ }
+            input, select, button { font-size: 16px !important; }
         }
-        /* セーフエリア対応 */
         body { padding-bottom: env(safe-area-inset-bottom); }
         header { padding-top: env(safe-area-inset-top); }
     </style>
@@ -74,7 +75,7 @@
             <h2 class="text-white font-semibold text-base sm:text-lg mb-3 sm:mb-4">銘柄を入力</h2>
             <div class="flex gap-2 sm:gap-4 items-end">
                 <div class="flex-1">
-                    <label class="block text-xs sm:text-sm text-gs-text/70 mb-1">銘柄コード</label>
+                    <label for="tickerInput" class="block text-xs sm:text-sm text-gs-text/70 mb-1">銘柄コード</label>
                     <input type="text" id="tickerInput" inputmode="numeric" autocomplete="off"
                         class="w-full bg-gs-dark border border-gs-border rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-white placeholder-gs-text/40 focus:border-gs-accent focus:outline-none focus:ring-1 focus:ring-gs-accent text-base"
                         placeholder="例: 7203, 9984, 6758">
@@ -90,7 +91,6 @@
                     <span id="stockTicker" class="text-gs-text/60 flex-shrink-0"></span>
                 </div>
             </div>
-            <!-- クイックアクセス -->
             <div class="mt-3 flex flex-wrap gap-1.5">
                 <span class="text-xs text-gs-text/40">例:</span>
                 <button onclick="quickTicker('7203')" class="text-xs bg-gs-dark/80 text-gs-text/60 px-2 py-0.5 rounded hover:text-white transition-colors">7203 トヨタ</button>
@@ -145,20 +145,12 @@ function quickTicker(code) {
     document.getElementById('tickerInput').value = code;
     searchStock();
 }
-
-// グローバルエラーハンドラー
 window.addEventListener('error', function(e) {
     console.error('Script error:', e.message, e.filename, e.lineno);
-    const statusEl = document.getElementById('initStatus');
-    if (statusEl) {
-        statusEl.textContent = 'スクリプト読み込みエラーが発生しました。ページを再読み込みしてください。';
-        statusEl.className = 'text-center text-red-400 text-xs mt-2';
-    }
+    var s = document.getElementById('initStatus');
+    if (s) { s.textContent = 'スクリプトエラーが発生しました。ページを再読み込みしてください。'; s.className = 'text-center text-red-400 text-xs mt-2'; }
 });
-
-window.addEventListener('unhandledrejection', function(e) {
-    console.error('Unhandled promise rejection:', e.reason);
-});
+window.addEventListener('unhandledrejection', function(e) { console.error('Unhandled rejection:', e.reason); });
 </script>
 <script src="js/fetcher.js" onerror="document.getElementById('initStatus').textContent='fetcher.js の読み込みに失敗しました'"></script>
 <script src="js/analyzers.js" onerror="document.getElementById('initStatus').textContent='analyzers.js の読み込みに失敗しました'"></script>
