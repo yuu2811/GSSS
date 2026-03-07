@@ -135,7 +135,8 @@
     <div class="max-w-7xl mx-auto px-3 sm:px-4 text-center text-gs-text/40 text-[10px] sm:text-xs">
         <p>GSSS - Goldman Sachs Style Stock Screener</p>
         <p class="mt-1">投資は自己責任で行ってください。本ツールの分析結果は投資助言ではありません。</p>
-        <p class="mt-1">データ: Yahoo Finance | CORSプロキシ経由</p>
+        <p class="mt-1">データ: Yahoo Finance | CORSプロキシ経由（一部データは取得制限あり）</p>
+        <p id="initStatus" class="mt-1 text-gs-text/30"></p>
     </div>
 </footer>
 
@@ -144,10 +145,24 @@ function quickTicker(code) {
     document.getElementById('tickerInput').value = code;
     searchStock();
 }
+
+// グローバルエラーハンドラー
+window.addEventListener('error', function(e) {
+    console.error('Script error:', e.message, e.filename, e.lineno);
+    const statusEl = document.getElementById('initStatus');
+    if (statusEl) {
+        statusEl.textContent = 'スクリプト読み込みエラーが発生しました。ページを再読み込みしてください。';
+        statusEl.className = 'text-center text-red-400 text-xs mt-2';
+    }
+});
+
+window.addEventListener('unhandledrejection', function(e) {
+    console.error('Unhandled promise rejection:', e.reason);
+});
 </script>
-<script src="js/fetcher.js"></script>
-<script src="js/analyzers.js"></script>
-<script src="js/renderers.js"></script>
-<script src="js/app.js"></script>
+<script src="js/fetcher.js" onerror="document.getElementById('initStatus').textContent='fetcher.js の読み込みに失敗しました'"></script>
+<script src="js/analyzers.js" onerror="document.getElementById('initStatus').textContent='analyzers.js の読み込みに失敗しました'"></script>
+<script src="js/renderers.js" onerror="document.getElementById('initStatus').textContent='renderers.js の読み込みに失敗しました'"></script>
+<script src="js/app.js" onerror="document.getElementById('initStatus').textContent='app.js の読み込みに失敗しました'"></script>
 </body>
 </html>

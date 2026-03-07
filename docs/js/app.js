@@ -57,17 +57,39 @@ async function searchStock() {
     nameEl.textContent = '読み込み中...';
     tickerEl.textContent = '';
     infoEl.classList.remove('hidden');
+    showStatus('データを取得中...', 'info');
 
     try {
         cachedStockData = await StockFetcher.fetchStockData(ticker);
         currentTicker = ticker;
         nameEl.textContent = cachedStockData.info.longName;
         tickerEl.textContent = `(${ticker})`;
+
+        if (cachedStockData._dataSource === 'chart_only') {
+            showStatus('基本データ取得成功（一部ファンダメンタルデータは利用不可）', 'warning');
+        } else {
+            showStatus('データ取得完了', 'success');
+        }
     } catch (e) {
-        nameEl.textContent = ticker;
-        tickerEl.textContent = '(情報取得中)';
+        // 検索APIでの名前取得を試みる
         currentTicker = ticker;
         cachedStockData = null;
+        try {
+            const results = await StockFetcher.searchTicker(input);
+            if (results.length > 0) {
+                nameEl.textContent = results[0].name;
+                tickerEl.textContent = `(${ticker})`;
+                showStatus('銘柄が見つかりました。分析メニューをお試しください。', 'info');
+            } else {
+                nameEl.textContent = ticker;
+                tickerEl.textContent = '';
+                showStatus('銘柄情報を取得できませんでした。コードを確認してください。', 'error');
+            }
+        } catch {
+            nameEl.textContent = ticker;
+            tickerEl.textContent = '(取得失敗)';
+            showStatus('データ取得に失敗しました。しばらく待ってから再試行してください。', 'error');
+        }
     }
 }
 
@@ -167,19 +189,63 @@ async function executeAnalysis(analyzerType, params) {
         }
 
         loading.classList.add('hidden');
-        results.innerHTML = renderAnalysis(analyzerType, data, info);
+
+        // データソース制限の注意メッセージ
+        let dataNotice = '';
+        if (cachedStockData && cachedStockData._dataSource === 'chart_only') {
+            dataNotice = `<div class="bg-yellow-900/30 border border-yellow-700/50 rounded-xl p-4 mb-4 text-center">
+                <p class="text-yellow-400 text-sm font-medium">⚠ ファンダメンタルデータの一部が取得できませんでした</p>
+                <p class="text-yellow-300/60 text-xs mt-1">価格チャートデータに基づく分析結果です。P/E、配当利回り等の指標はN/Aと表示される場合があります。</p>
+            </div>`;
+        }
+
+        results.innerHTML = dataNotice + renderAnalysis(analyzerType, data, info);
         results.classList.remove('hidden');
         results.scrollIntoView({ behavior: 'smooth' });
+        showStatus('分析完了', 'success');
 
     } catch (e) {
         loading.classList.add('hidden');
+        console.error('Analysis error:', e);
         results.innerHTML = renderError(e.message || '分析中にエラーが発生しました');
         results.classList.remove('hidden');
+        showStatus('分析中にエラーが発生しました', 'error');
     }
 }
 
 function renderError(msg) {
-    return `<div class="bg-red-900/30 border border-red-700/50 rounded-xl p-6 text-center"><p class="text-red-400 font-medium">エラー</p><p class="text-red-300/80 mt-2 text-sm">${msg}</p><p class="text-red-300/50 mt-3 text-xs">CORSプロキシの制限により取得できない場合があります。<br>しばらく待ってから再試行してください。</p></div>`;
+    return `<div class="bg-red-900/30 border border-red-700/50 rounded-xl p-6 text-center">
+        <p class="text-red-400 font-medium text-lg">エラー</p>
+        <p class="text-red-300/80 mt-2 text-sm">${escapeHtml(msg)}</p>
+        <p class="text-red-300/50 mt-3 text-xs">CORSプロキシの制限やYahoo Finance APIの仕様変更により<br>データを取得できない場合があります。</p>
+        <button onclick="location.reload()" class="mt-4 bg-red-800/50 hover:bg-red-800/80 text-red-300 px-4 py-2 rounded-lg text-sm transition-colors">ページを再読み込み</button>
+    </div>`;
+}
+
+function showStatus(message, type = 'info') {
+    let statusEl = document.getElementById('statusBar');
+    if (!statusEl) {
+        statusEl = document.createElement('div');
+        statusEl.id = 'statusBar';
+        statusEl.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 z-50 max-w-[90vw] text-center';
+        document.body.appendChild(statusEl);
+    }
+
+    const colors = {
+        info: 'bg-gs-accent/90 text-white',
+        success: 'bg-green-600/90 text-white',
+        warning: 'bg-yellow-600/90 text-white',
+        error: 'bg-red-600/90 text-white',
+    };
+
+    statusEl.className = `fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 z-50 max-w-[90vw] text-center ${colors[type] || colors.info}`;
+    statusEl.textContent = message;
+    statusEl.style.opacity = '1';
+
+    clearTimeout(statusEl._timer);
+    statusEl._timer = setTimeout(() => {
+        statusEl.style.opacity = '0';
+    }, type === 'error' ? 5000 : 3000);
 }
 
 function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
