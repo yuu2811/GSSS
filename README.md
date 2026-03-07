@@ -60,6 +60,47 @@ gunicorn -w 4 -b 0.0.0.0:5000 app:app
 
 ---
 
+## GitHub Pages でのデプロイ（推奨）
+
+Python環境なしで利用できる**完全静的版**を `docs/` フォルダに用意しています。GitHub Pages を有効にするだけでスマホからもアクセス可能です。
+
+### デプロイ手順
+
+1. GitHubリポジトリの **Settings** → **Pages** を開く
+2. **Source** で **Deploy from a branch** を選択
+3. **Branch** を `main`（またはこのブランチ）、フォルダを `/docs` に設定
+4. **Save** をクリック
+5. 数分後に `https://<ユーザー名>.github.io/GSSS/` でアクセス可能
+
+### 静的版の特徴
+
+| 項目 | 説明 |
+|------|------|
+| サーバー | 不要（GitHub Pagesで完結） |
+| データ取得 | CORSプロキシ経由でYahoo Finance APIに直接アクセス |
+| 分析エンジン | 10種類すべてをJavaScriptで実装 |
+| モバイル対応 | スマートフォン・タブレットのブラウザに最適化 |
+| 費用 | 完全無料（GitHub Pages + Yahoo Finance） |
+
+### ファイル構成（静的版）
+
+```
+docs/
+├── index.html          # メインHTML（スマホ対応レスポンシブ）
+└── js/
+    ├── app.js           # アプリ制御・UI
+    ├── fetcher.js       # Yahoo Finance APIクライアント
+    ├── analyzers.js     # 10種類の分析エンジン（JS版）
+    └── renderers.js     # 分析結果レンダリング
+```
+
+### 注意点（静的版）
+
+- **CORSプロキシ**: Yahoo Finance APIはCORS制限があるため、`corsproxy.io` を経由してデータを取得しています。プロキシが一時的に利用できない場合、データ取得に失敗する可能性があります。
+- **レートリミット**: 短時間に大量のリクエストを送ると制限される場合があります。エラーが出た場合はしばらく待ってから再試行してください。
+
+---
+
 ## 使い方
 
 ### 1. 銘柄を指定して分析する場合
