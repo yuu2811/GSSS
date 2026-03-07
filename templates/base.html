@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GSSS - 日本株式プロフェッショナル分析</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'gs-navy': '#003A70',
+                        'gs-gold': '#B5985A',
+                        'gs-dark': '#0A1628',
+                        'gs-card': '#111D33',
+                        'gs-border': '#1E3050',
+                        'gs-text': '#C8D6E5',
+                        'gs-accent': '#4A9EFF',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Noto Sans JP', sans-serif; }
+        .loader { border: 3px solid #1E3050; border-top: 3px solid #4A9EFF; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .analyzer-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(74, 158, 255, 0.15); }
+        .analyzer-card { transition: all 0.2s ease; }
+        .score-bar { transition: width 1s ease-out; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0A1628; }
+        ::-webkit-scrollbar-thumb { background: #1E3050; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #2A4060; }
+    </style>
+</head>
+<body class="bg-gs-dark text-gs-text min-h-screen">
+    {% block content %}{% endblock %}
+    {% block scripts %}{% endblock %}
+</body>
+</html>
