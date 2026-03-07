@@ -1,5 +1,7 @@
 /**
- * GSSS - GitHub Pages 版 メインアプリケーション
+ * GSSS - GitHub Pages 版 メインアプリケーション (Advanced)
+ *
+ * 機能: 検索履歴, キーボードショートカット, スケルトンローダー, SVGスパークライン対応
  */
 
 // ── 分析エンジン定義 ────────────────────────────────
@@ -21,30 +23,166 @@ let currentTicker = '';
 let currentAnalyzer = '';
 let cachedStockData = null;
 let statusTimer = null;
+const HISTORY_KEY = 'gsss_search_history';
+const MAX_HISTORY = 8;
+
+// ══════════════════════════════════════════════════════
+// 検索履歴
+// ══════════════════════════════════════════════════════
+function getSearchHistory() {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
+    catch { return []; }
+}
+
+function addToHistory(ticker, name) {
+    const history = getSearchHistory().filter(h => h.ticker !== ticker);
+    history.unshift({ ticker, name, ts: Date.now() });
+    if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch {}
+    renderSearchHistory();
+}
+
+function removeFromHistory(ticker) {
+    const history = getSearchHistory().filter(h => h.ticker !== ticker);
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch {}
+    renderSearchHistory();
+}
+
+function clearSearchHistory() {
+    try { localStorage.removeItem(HISTORY_KEY); } catch {}
+    renderSearchHistory();
+}
+
+function renderSearchHistory() {
+    const container = document.getElementById('searchHistory');
+    const chips = document.getElementById('searchHistoryChips');
+    const history = getSearchHistory();
+
+    if (history.length === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+    container.classList.remove('hidden');
+    chips.innerHTML = history.map(h => {
+        const code = h.ticker.replace('.T', '');
+        const label = h.name ? `${code} ${h.name.substring(0, 6)}` : code;
+        return `<div class="history-chip ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg flex items-center gap-1.5 cursor-pointer" onclick="quickTicker('${esc(code)}')">
+            <span>${esc(label)}</span>
+            <button class="close-btn text-gs-text-muted/40 hover:text-red-400 text-sm leading-none" onclick="event.stopPropagation();removeFromHistory('${esc(h.ticker)}')">&times;</button>
+        </div>`;
+    }).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// キーボードショートカット
+// ══════════════════════════════════════════════════════
+function showShortcutsModal() {
+    document.getElementById('shortcutsModal').classList.remove('hidden');
+}
+
+function hideShortcutsModal() {
+    document.getElementById('shortcutsModal').classList.add('hidden');
+}
+
+function setupKeyboardShortcuts() {
+    document.addEventListener('keydown', e => {
+        // Ignore if typing in input/select/textarea
+        const tag = document.activeElement?.tagName;
+        if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
+            if (e.key === 'Escape') { document.activeElement.blur(); return; }
+            return;
+        }
+
+        switch (e.key) {
+            case '/':
+                e.preventDefault();
+                document.getElementById('tickerInput').focus();
+                break;
+            case '?':
+                e.preventDefault();
+                showShortcutsModal();
+                break;
+            case 'Escape':
+                hideShortcutsModal();
+                break;
+            case 'r':
+            case 'R':
+                const results = document.getElementById('results');
+                if (!results.classList.contains('hidden')) {
+                    results.scrollIntoView({ behavior: 'smooth' });
+                }
+                break;
+            case 't':
+            case 'T':
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                break;
+        }
+    });
+}
+
+// ══════════════════════════════════════════════════════
+// スケルトンローダー
+// ══════════════════════════════════════════════════════
+function showSkeletonLoader() {
+    const results = document.getElementById('results');
+    results.innerHTML = `
+        <div class="fade-in">
+            <!-- Header skeleton -->
+            <div class="card-elevated rounded-2xl p-6 mb-6">
+                <div class="flex items-center gap-4">
+                    <div class="skeleton w-12 h-12 rounded-xl"></div>
+                    <div class="flex-1">
+                        <div class="skeleton h-6 w-48 mb-2"></div>
+                        <div class="skeleton h-4 w-32"></div>
+                    </div>
+                </div>
+                <div class="skeleton h-10 w-40 mt-4"></div>
+            </div>
+            <!-- Cards skeleton -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                ${[1,2,3,4].map(() => `
+                    <div class="card-elevated rounded-2xl p-5">
+                        <div class="skeleton h-4 w-32 mb-4"></div>
+                        <div class="space-y-3">
+                            <div class="flex justify-between"><div class="skeleton h-3 w-24"></div><div class="skeleton h-3 w-16"></div></div>
+                            <div class="flex justify-between"><div class="skeleton h-3 w-20"></div><div class="skeleton h-3 w-20"></div></div>
+                            <div class="flex justify-between"><div class="skeleton h-3 w-28"></div><div class="skeleton h-3 w-12"></div></div>
+                            <div class="skeleton h-2 w-full mt-2"></div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>`;
+    results.classList.remove('hidden');
+}
 
 // ── 初期化 ──────────────────────────────────────────
 function init() {
     const grid = document.getElementById('analyzerGrid');
     for (const [key, a] of Object.entries(ANALYZERS)) {
         const div = document.createElement('div');
-        div.className = 'analyzer-card bg-gs-card border border-gs-border rounded-xl p-4 sm:p-5 cursor-pointer active:scale-[0.98]';
+        div.className = 'analyzer-card bg-gs-card rounded-2xl p-4 sm:p-5 cursor-pointer';
         div.setAttribute('data-analyzer', key);
         div.onclick = () => runAnalysis(key);
         div.innerHTML = `
             <div class="flex items-start gap-3">
-                <span class="text-2xl flex-shrink-0">${a.icon}</span>
+                <div class="text-2xl flex-shrink-0 mt-0.5">${a.icon}</div>
                 <div class="flex-1 min-w-0">
-                    <h3 class="text-white font-medium text-sm mb-1">${a.short}</h3>
-                    <p class="text-gs-text/60 text-xs leading-relaxed">${a.description}</p>
+                    <h3 class="text-white font-semibold text-sm mb-1 tracking-tight">${a.short}</h3>
+                    <p class="text-gs-text-muted text-xs leading-relaxed">${a.description}</p>
                 </div>
             </div>
-            ${!a.needs_ticker ? '<div class="mt-3"><span class="text-xs bg-gs-navy/50 text-gs-accent px-2 py-0.5 rounded">銘柄コード不要</span></div>' : ''}`;
+            ${!a.needs_ticker ? '<div class="mt-3"><span class="badge-no-ticker text-[10px] text-gs-accent px-2.5 py-1 rounded-md font-medium inline-block">銘柄コード不要</span></div>' : ''}`;
         grid.appendChild(div);
     }
 
     document.getElementById('tickerInput').addEventListener('keydown', e => {
         if (e.key === 'Enter') searchStock();
     });
+
+    // Initialize features
+    renderSearchHistory();
+    setupKeyboardShortcuts();
 }
 
 // ── 銘柄検索 ────────────────────────────────────────
@@ -65,8 +203,10 @@ async function searchStock() {
     try {
         cachedStockData = await StockFetcher.fetchStockData(ticker);
         currentTicker = ticker;
-        nameEl.textContent = cachedStockData.info.longName;
+        const name = cachedStockData.info.longName;
+        nameEl.textContent = name;
         tickerEl.textContent = `(${ticker})`;
+        addToHistory(ticker, name);
 
         if (cachedStockData._dataSource === 'chart_only') {
             showStatus('基本データ取得成功（一部ファンダメンタルデータは利用不可）', 'warning');
@@ -81,6 +221,7 @@ async function searchStock() {
             if (results.length > 0) {
                 nameEl.textContent = results[0].name;
                 tickerEl.textContent = `(${ticker})`;
+                addToHistory(ticker, results[0].name);
                 showStatus('銘柄が見つかりました。分析メニューをお試しください。', 'info');
             } else {
                 nameEl.textContent = ticker;
@@ -103,7 +244,7 @@ async function runAnalysis(analyzerType) {
     if (info.needs_ticker) {
         const input = document.getElementById('tickerInput').value.trim();
         if (!input && !currentTicker) {
-            alert('銘柄コードを入力してください');
+            showStatus('銘柄コードを入力してください', 'error');
             document.getElementById('tickerInput').focus();
             return;
         }
@@ -126,17 +267,17 @@ function showParamsForm(analyzerType) {
     const title = document.getElementById('paramsTitle');
     section.classList.remove('hidden');
 
-    const inputClass = 'w-full bg-gs-dark border border-gs-border rounded-lg px-4 py-3 text-white focus:border-gs-accent focus:outline-none text-base';
+    const inputClass = 'input-glow w-full bg-gs-darker border border-gs-border rounded-xl px-4 py-3 text-white focus:border-gs-accent focus:outline-none text-base transition-all duration-200';
 
     if (analyzerType === 'blackrock') {
         title.textContent = 'BlackRock 配当分析 - パラメータ';
-        content.innerHTML = `<div><label class="block text-sm text-gs-text/70 mb-1">投資金額（円）</label><input type="number" id="param_investment_amount" value="1000000" class="${inputClass}"></div>`;
+        content.innerHTML = `<div><label class="block text-sm text-gs-text-muted mb-1.5">投資金額（円）</label><input type="number" id="param_investment_amount" value="1000000" class="${inputClass}"></div>`;
     } else {
         title.textContent = 'Vanguard ETFポートフォリオ - パラメータ';
         content.innerHTML = `
-            <div><label class="block text-sm text-gs-text/70 mb-1">年齢</label><input type="number" id="param_age" value="35" class="${inputClass}"></div>
-            <div><label class="block text-sm text-gs-text/70 mb-1">投資金額（円）</label><input type="number" id="param_investment_amount" value="1000000" class="${inputClass}"></div>
-            <div><label class="block text-sm text-gs-text/70 mb-1">リスクプロファイル</label><select id="param_risk_profile" class="${inputClass}"><option value="積極型">積極型</option><option value="やや積極型">やや積極型</option><option value="バランス型" selected>バランス型</option><option value="やや保守型">やや保守型</option><option value="保守型">保守型</option></select></div>`;
+            <div><label class="block text-sm text-gs-text-muted mb-1.5">年齢</label><input type="number" id="param_age" value="35" class="${inputClass}"></div>
+            <div><label class="block text-sm text-gs-text-muted mb-1.5">投資金額（円）</label><input type="number" id="param_investment_amount" value="1000000" class="${inputClass}"></div>
+            <div><label class="block text-sm text-gs-text-muted mb-1.5">リスクプロファイル</label><select id="param_risk_profile" class="${inputClass}"><option value="積極型">積極型</option><option value="やや積極型">やや積極型</option><option value="バランス型" selected>バランス型</option><option value="やや保守型">やや保守型</option><option value="保守型">保守型</option></select></div>`;
     }
     section.scrollIntoView({ behavior: 'smooth' });
 }
@@ -160,9 +301,9 @@ async function executeAnalysis(analyzerType, params) {
     const loadingText = document.getElementById('loadingText');
     const info = ANALYZERS[analyzerType];
 
+    // Show skeleton loader instead of spinner for better UX
     loading.classList.remove('hidden');
-    results.classList.add('hidden');
-    results.innerHTML = '';
+    showSkeletonLoader();
     loadingText.textContent = 'データを取得中...';
     loading.scrollIntoView({ behavior: 'smooth' });
 
@@ -193,13 +334,14 @@ async function executeAnalysis(analyzerType, params) {
 
         let dataNotice = '';
         if (cachedStockData && cachedStockData._dataSource === 'chart_only') {
-            dataNotice = `<div class="bg-yellow-900/30 border border-yellow-700/50 rounded-xl p-4 mb-4 text-center">
+            dataNotice = `<div class="bg-yellow-900/20 border border-yellow-700/30 rounded-2xl p-4 sm:p-5 mb-5 text-center">
                 <p class="text-yellow-400 text-sm font-medium">ファンダメンタルデータの一部が取得できませんでした</p>
-                <p class="text-yellow-300/60 text-xs mt-1">価格チャートデータに基づく分析結果です。P/E、配当利回り等の指標はN/Aと表示される場合があります。</p>
+                <p class="text-yellow-300/50 text-xs mt-1.5">価格チャートデータに基づく分析結果です。P/E、配当利回り等の指標はN/Aと表示される場合があります。</p>
             </div>`;
         }
 
-        results.innerHTML = dataNotice + renderAnalysis(analyzerType, data, info);
+        // Pass cachedStockData for sparklines and 52-week range
+        results.innerHTML = dataNotice + renderAnalysis(analyzerType, data, info, cachedStockData);
         results.classList.remove('hidden');
         results.scrollIntoView({ behavior: 'smooth' });
         showStatus('分析完了', 'success');
@@ -215,11 +357,12 @@ async function executeAnalysis(analyzerType, params) {
 
 // ── UI ヘルパー ──────────────────────────────────────
 function renderError(msg) {
-    return `<div class="bg-red-900/30 border border-red-700/50 rounded-xl p-6 text-center">
-        <p class="text-red-400 font-medium text-lg">エラー</p>
-        <p class="text-red-300/80 mt-2 text-sm">${esc(msg)}</p>
-        <p class="text-red-300/50 mt-3 text-xs">CORSプロキシの制限やYahoo Finance APIの仕様変更により<br>データを取得できない場合があります。</p>
-        <button onclick="location.reload()" class="mt-4 bg-red-800/50 hover:bg-red-800/80 text-red-300 px-4 py-2 rounded-lg text-sm transition-colors">ページを再読み込み</button>
+    return `<div class="bg-red-900/20 border border-red-700/30 rounded-2xl p-6 sm:p-8 text-center fade-in">
+        <div class="text-red-400 text-3xl mb-3">&#x26A0;</div>
+        <p class="text-red-400 font-semibold text-lg">エラー</p>
+        <p class="text-red-300/70 mt-2 text-sm leading-relaxed">${esc(msg)}</p>
+        <p class="text-red-300/40 mt-3 text-xs">CORSプロキシの制限やYahoo Finance APIの仕様変更により<br>データを取得できない場合があります。</p>
+        <button onclick="location.reload()" class="mt-5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 px-5 py-2.5 rounded-xl text-sm transition-colors font-medium">ページを再読み込み</button>
     </div>`;
 }
 
@@ -231,13 +374,22 @@ function showStatus(message, type = 'info') {
         document.body.appendChild(el);
     }
 
-    const colors = { info: 'bg-gs-accent/90', success: 'bg-green-600/90', warning: 'bg-yellow-600/90', error: 'bg-red-600/90' };
-    el.className = `fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all duration-300 z-50 max-w-[90vw] text-center ${colors[type] || colors.info}`;
+    const colors = {
+        info: 'bg-gs-accent/90 border-gs-accent/30',
+        success: 'bg-green-600/90 border-green-500/30',
+        warning: 'bg-yellow-600/90 border-yellow-500/30',
+        error: 'bg-red-600/90 border-red-500/30'
+    };
+    el.className = `status-toast fixed bottom-4 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-xl text-sm font-medium text-white transition-all duration-300 z-50 max-w-[90vw] text-center border ${colors[type] || colors.info}`;
     el.textContent = message;
     el.style.opacity = '1';
+    el.style.transform = 'translateX(-50%) translateY(0)';
 
     clearTimeout(statusTimer);
-    statusTimer = setTimeout(() => { el.style.opacity = '0'; }, type === 'error' ? 5000 : 3000);
+    statusTimer = setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateX(-50%) translateY(8px)';
+    }, type === 'error' ? 5000 : 3000);
 }
 
 // ── 起動 ────────────────────────────────────────────
