@@ -212,6 +212,72 @@
             background: linear-gradient(135deg, rgba(0, 58, 112, 0.5) 0%, rgba(0, 42, 82, 0.3) 100%);
             border: 1px solid rgba(74, 158, 255, 0.15);
         }
+
+        /* Skeleton loading */
+        .skeleton {
+            background: linear-gradient(90deg, rgba(26, 45, 72, 0.3) 25%, rgba(36, 58, 88, 0.5) 50%, rgba(26, 45, 72, 0.3) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s ease-in-out infinite;
+            border-radius: 8px;
+        }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        /* Sparkline */
+        .sparkline-path {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: drawLine 1.5s ease-out forwards;
+        }
+        @keyframes drawLine { to { stroke-dashoffset: 0; } }
+
+        .sparkline-area {
+            opacity: 0;
+            animation: fadeArea 1s ease-out 0.5s forwards;
+        }
+        @keyframes fadeArea { to { opacity: 0.15; } }
+
+        /* 52-week range bar */
+        .range-bar { position: relative; height: 6px; border-radius: 3px; overflow: visible; }
+        .range-marker {
+            position: absolute; top: -3px; width: 12px; height: 12px;
+            border-radius: 50%; border: 2px solid #070E1A;
+            transform: translateX(-50%);
+            transition: left 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Heatmap cell */
+        .heatmap-cell {
+            transition: all 0.15s ease;
+            cursor: default;
+        }
+        .heatmap-cell:hover {
+            transform: scale(1.05);
+            z-index: 10;
+        }
+
+        /* Keyboard shortcut hint */
+        .kbd {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 22px; height: 22px; padding: 0 5px;
+            font-size: 11px; font-family: 'Inter', monospace;
+            background: rgba(26, 45, 72, 0.5); border: 1px solid rgba(36, 58, 88, 0.8);
+            border-radius: 4px; color: #7A8FA6;
+        }
+
+        /* Modal overlay */
+        .modal-overlay {
+            background: rgba(4, 8, 16, 0.8);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        /* History chip close */
+        .history-chip .close-btn { opacity: 0; transition: opacity 0.15s; }
+        .history-chip:hover .close-btn { opacity: 1; }
+
+        /* Price change badge */
+        .price-up { color: #4ade80; }
+        .price-down { color: #f87171; }
     </style>
 </head>
 <body class="bg-gs-dark text-gs-text min-h-screen relative">
@@ -226,7 +292,11 @@
                 <p class="text-gs-text-muted text-[10px] sm:text-xs hidden sm:block tracking-wide">Goldman Sachs Style Stock Screener</p>
             </div>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 sm:gap-3">
+            <button onclick="showShortcutsModal()" class="hidden sm:flex items-center gap-1.5 text-gs-text-muted/50 hover:text-gs-text-muted transition-colors text-xs" title="キーボードショートカット">
+                <span class="kbd">/</span>
+                <span class="text-[10px]">検索</span>
+            </button>
             <div class="text-gs-text-muted text-[10px] sm:text-xs text-right leading-tight">日本株式<br class="sm:hidden"><span class="hidden sm:inline"> </span>プロフェッショナル分析</div>
         </div>
     </div>
@@ -258,6 +328,14 @@
                     <span id="stockName" class="text-white font-medium truncate"></span>
                     <span id="stockTicker" class="text-gs-text-muted flex-shrink-0"></span>
                 </div>
+            </div>
+            <!-- Search History -->
+            <div id="searchHistory" class="mt-3 hidden">
+                <div class="flex items-center gap-1.5 mb-1.5">
+                    <span class="text-[10px] text-gs-text-muted/40">最近の検索:</span>
+                    <button onclick="clearSearchHistory()" class="text-[10px] text-gs-text-muted/30 hover:text-red-400 transition-colors ml-auto">クリア</button>
+                </div>
+                <div id="searchHistoryChips" class="flex flex-wrap gap-1.5"></div>
             </div>
             <div class="mt-3.5 flex flex-wrap items-center gap-1.5">
                 <span class="text-xs text-gs-text-muted/50 mr-0.5">例:</span>
@@ -316,6 +394,23 @@
         <p id="initStatus" class="mt-2 text-gs-text-muted/25 text-[10px]"></p>
     </div>
 </footer>
+
+<!-- Keyboard Shortcuts Modal -->
+<div id="shortcutsModal" class="hidden fixed inset-0 modal-overlay z-[100] flex items-center justify-center p-4" onclick="if(event.target===this)hideShortcutsModal()">
+    <div class="card-elevated rounded-2xl p-6 sm:p-8 max-w-sm w-full fade-in">
+        <div class="flex items-center justify-between mb-5">
+            <h3 class="text-white font-semibold text-base">キーボードショートカット</h3>
+            <button onclick="hideShortcutsModal()" class="text-gs-text-muted hover:text-white transition-colors text-lg">&times;</button>
+        </div>
+        <div class="space-y-3">
+            <div class="flex justify-between items-center"><span class="text-gs-text-muted text-sm">検索にフォーカス</span><span class="kbd">/</span></div>
+            <div class="flex justify-between items-center"><span class="text-gs-text-muted text-sm">モーダルを閉じる</span><span class="kbd">Esc</span></div>
+            <div class="flex justify-between items-center"><span class="text-gs-text-muted text-sm">ショートカット表示</span><span class="kbd">?</span></div>
+            <div class="flex justify-between items-center"><span class="text-gs-text-muted text-sm">結果までスクロール</span><span class="kbd">R</span></div>
+            <div class="flex justify-between items-center"><span class="text-gs-text-muted text-sm">ページトップへ</span><span class="kbd">T</span></div>
+        </div>
+    </div>
+</div>
 
 <script>
 function quickTicker(code) {

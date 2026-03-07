@@ -107,6 +107,149 @@ function renderTable(headers, rows) {
     return html;
 }
 
+// ══════════════════════════════════════════════════════
+// SVG スパークライン
+// ══════════════════════════════════════════════════════
+function sparkline(data, options = {}) {
+    if (!data || data.length < 2) return '';
+    const { width = 200, height = 48, color = '#4A9EFF', showArea = true, label = '' } = options;
+
+    // Normalize data
+    const values = data.map(d => typeof d === 'number' ? d : d.close ?? d.value ?? 0);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1;
+
+    // Build SVG path
+    const xStep = width / (values.length - 1);
+    const points = values.map((v, i) => {
+        const x = i * xStep;
+        const y = height - 4 - ((v - min) / range) * (height - 8);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+    const pathD = `M${points.join(' L')}`;
+
+    // Area path (closed)
+    const areaD = `${pathD} L${width},${height} L0,${height} Z`;
+
+    // Determine color based on trend
+    const isUp = values[values.length - 1] >= values[0];
+    const lineColor = color === 'auto' ? (isUp ? '#4ade80' : '#f87171') : color;
+    const areaColor = color === 'auto' ? (isUp ? '#4ade80' : '#f87171') : color;
+
+    // Start/end labels
+    const startVal = values[0];
+    const endVal = values[values.length - 1];
+    const changePct = ((endVal - startVal) / startVal * 100).toFixed(1);
+    const changeClass = endVal >= startVal ? 'price-up' : 'price-down';
+    const changeSign = endVal >= startVal ? '+' : '';
+
+    let labelHtml = '';
+    if (label) {
+        labelHtml = `<div class="flex justify-between items-center mb-1.5">
+            <span class="text-[10px] text-gs-text-muted">${esc(label)}</span>
+            <span class="text-[10px] ${changeClass} font-medium">${changeSign}${changePct}%</span>
+        </div>`;
+    }
+
+    return `<div class="sparkline-container">
+        ${labelHtml}
+        <svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" preserveAspectRatio="none" class="overflow-visible">
+            ${showArea ? `<path d="${areaD}" fill="${areaColor}" class="sparkline-area"/>` : ''}
+            <path d="${pathD}" fill="none" stroke="${lineColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="sparkline-path"/>
+            <circle cx="${width}" cy="${points[points.length-1].split(',')[1]}" r="2.5" fill="${lineColor}"/>
+        </svg>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════
+// 52週レンジバー
+// ══════════════════════════════════════════════════════
+function rangeBar52w(current, low, high) {
+    if (low == null || high == null || current == null) return '';
+    const range = high - low;
+    if (range <= 0) return '';
+    const pct = Math.max(0, Math.min(100, ((current - low) / range) * 100));
+    const isNearHigh = pct > 80;
+    const isNearLow = pct < 20;
+    const markerColor = isNearHigh ? '#4ade80' : isNearLow ? '#f87171' : '#4A9EFF';
+
+    return `<div class="mt-4">
+        <div class="flex justify-between text-[10px] text-gs-text-muted mb-1.5">
+            <span>52週安値 &yen;${formatNumber(low)}</span>
+            <span>52週高値 &yen;${formatNumber(high)}</span>
+        </div>
+        <div class="range-bar bg-gradient-to-r from-red-900/40 via-gs-border to-green-900/40">
+            <div class="range-marker" style="left:${pct}%;background:${markerColor}"></div>
+        </div>
+        <div class="text-center mt-2">
+            <span class="text-[10px] text-gs-text-muted">現在 &yen;${formatNumber(current)}</span>
+            <span class="text-[10px] text-gs-text-muted/50 ml-1">(レンジ内 ${pct.toFixed(0)}%)</span>
+        </div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════
+// ヒートマップ感度分析テーブル
+// ══════════════════════════════════════════════════════
+function heatmapTable(sens, currentPrice) {
+    if (!sens.table?.length) return '';
+    const gh = sens.growth_range || [];
+
+    // Calculate min/max for color scaling
+    let allVals = [];
+    sens.table.forEach(row => gh.forEach(g => { const v = row[`g_${g}`]; if (v != null) allVals.push(v); }));
+    const minVal = Math.min(...allVals);
+    const maxVal = Math.max(...allVals);
+    const valRange = maxVal - minVal || 1;
+
+    let html = '<div class="overflow-x-auto -mx-1"><table class="w-full text-xs border-collapse"><thead><tr><th class="py-2 px-1.5 text-left font-medium text-gs-text-muted">WACC</th>';
+    gh.forEach(g => { html += `<th class="text-center py-2 px-1.5 font-medium text-gs-text-muted">g=${esc(g)}</th>`; });
+    html += '</tr></thead><tbody>';
+
+    sens.table.forEach(row => {
+        html += `<tr><td class="py-1.5 px-1.5 font-medium text-white text-xs">${row.wacc_pct}%</td>`;
+        gh.forEach(g => {
+            const key = `g_${g}`;
+            const sv = row[key];
+            const isAbove = currentPrice && sv > currentPrice;
+
+            // Color intensity based on distance from current price
+            let bgColor, textColor;
+            if (currentPrice) {
+                const diff = (sv - currentPrice) / currentPrice;
+                if (diff > 0) {
+                    const intensity = Math.min(diff / 0.5, 1);
+                    bgColor = `rgba(74, 222, 128, ${(intensity * 0.3 + 0.05).toFixed(2)})`;
+                    textColor = '#4ade80';
+                } else {
+                    const intensity = Math.min(Math.abs(diff) / 0.5, 1);
+                    bgColor = `rgba(248, 113, 113, ${(intensity * 0.3 + 0.05).toFixed(2)})`;
+                    textColor = '#f87171';
+                }
+            } else {
+                const norm = (sv - minVal) / valRange;
+                bgColor = `rgba(74, 158, 255, ${(norm * 0.2 + 0.05).toFixed(2)})`;
+                textColor = '#C8D6E5';
+            }
+
+            html += `<td class="heatmap-cell text-center py-1.5 px-1 rounded" style="background:${bgColor}">
+                <span style="color:${textColor}" class="font-medium text-[11px]">&yen;${formatNumber(sv)}</span>
+            </td>`;
+        });
+        html += '</tr>';
+    });
+    html += `</tbody></table></div>`;
+    if (currentPrice) {
+        html += `<div class="flex items-center gap-3 mt-3 text-[10px] text-gs-text-muted/60">
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:rgba(74,222,128,0.25)"></span>割安</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:rgba(248,113,113,0.25)"></span>割高</span>
+            <span class="ml-auto italic">${esc(sens.note || '')}</span>
+        </div>`;
+    }
+    return html;
+}
+
 // ── バナーカード ───────────────────────────────────
 function bannerCard(content) {
     return `<div class="banner-glow rounded-2xl p-5 sm:p-6 mb-6 fade-in">${content}</div>`;
@@ -123,23 +266,56 @@ function bigScore(score, max, label, colorFn) {
 }
 
 // ── メインディスパッチ ──────────────────────────────
-function renderAnalysis(type, data, info) {
-    const priceHtml = data.current_price
-        ? `<div class="mt-4 flex items-baseline gap-2">
+function renderAnalysis(type, data, info, stockData) {
+    // Price section with change indicator
+    let priceHtml = '';
+    if (data.current_price) {
+        const history = stockData?.history || [];
+        const prevClose = history.length > 1 ? history[history.length - 2]?.close : null;
+        const change = prevClose ? data.current_price - prevClose : null;
+        const changePct = prevClose ? ((change / prevClose) * 100) : null;
+        const changeHtml = change != null
+            ? `<span class="text-sm font-medium ml-2 ${change >= 0 ? 'price-up' : 'price-down'}">${change >= 0 ? '+' : ''}${change.toFixed(0)} (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)</span>`
+            : '';
+        priceHtml = `<div class="mt-4 flex items-baseline gap-1 flex-wrap">
             <span class="text-3xl text-white font-bold tracking-tight">&yen;${formatNumber(data.current_price)}</span>
-            <span class="text-gs-text-muted text-sm">現在値</span>
+            ${changeHtml}
+        </div>`;
+    }
+
+    // 52-week range bar
+    const infoData = stockData?.info;
+    const range52w = infoData ? rangeBar52w(data.current_price, infoData.fiftyTwoWeekLow, infoData.fiftyTwoWeekHigh) : '';
+
+    // Price sparkline (last 90 days)
+    const history = stockData?.history || [];
+    const recentHistory = history.slice(-90);
+    const sparklineHtml = recentHistory.length > 10
+        ? `<div class="mt-4">${sparkline(recentHistory, { color: 'auto', height: 56, label: '90日チャート' })}</div>`
+        : '';
+
+    // Sector & industry info
+    const sectorHtml = (infoData?.sector || infoData?.industry)
+        ? `<div class="flex flex-wrap gap-1.5 mt-2">
+            ${infoData.sector ? `<span class="text-[10px] bg-gs-darker/80 text-gs-text-muted px-2 py-0.5 rounded">${esc(infoData.sector)}</span>` : ''}
+            ${infoData.industry ? `<span class="text-[10px] bg-gs-darker/80 text-gs-text-muted px-2 py-0.5 rounded">${esc(infoData.industry)}</span>` : ''}
            </div>`
         : '';
 
     const header = bannerCard(`
-        <div class="flex items-center gap-4">
-            <div class="text-4xl">${esc(info.icon)}</div>
+        <div class="flex items-start gap-4">
+            <div class="text-4xl mt-1">${esc(info.icon)}</div>
             <div class="flex-1">
                 <h2 class="text-white font-bold text-xl sm:text-2xl tracking-tight">${esc(info.name)}</h2>
                 ${data.company_name ? `<p class="text-gs-text-muted mt-0.5">${esc(data.company_name)} <span class="text-gs-accent/70">(${esc(data.ticker)})</span></p>` : ''}
+                ${sectorHtml}
             </div>
         </div>
         ${priceHtml}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+            <div>${sparklineHtml}</div>
+            <div>${range52w}</div>
+        </div>
     `);
 
     const renderers = {
@@ -150,7 +326,7 @@ function renderAnalysis(type, data, info) {
         mckinsey: renderMcKinsey, morgan_dcf: renderMorganDCF,
     };
     const render = renderers[type];
-    const content = render ? render(data) : `<pre class="text-xs overflow-auto p-4 bg-gs-darker rounded-xl">${esc(JSON.stringify(data, null, 2))}</pre>`;
+    const content = render ? render(data, stockData) : `<pre class="text-xs overflow-auto p-4 bg-gs-darker rounded-xl">${esc(JSON.stringify(data, null, 2))}</pre>`;
     return header + content;
 }
 
@@ -434,7 +610,7 @@ function renderMcKinsey(d) {
 // ════════════════════════════════════════════════════
 // Morgan Stanley DCF
 // ════════════════════════════════════════════════════
-function renderMorganDCF(d) {
+function renderMorganDCF(d, stockData) {
     let html = '';
     const v = d.verdict || {};
     if (v.verdict) {
@@ -446,19 +622,25 @@ function renderMorganDCF(d) {
             </div>`);
     }
     html += '<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">';
+
+    // Revenue projection with sparkline
     const proj = d.projections || {};
     if (proj.yearly) {
-        html += card('5年間収益予測', `<div class="text-xs text-gs-text-muted/60 mb-3 italic">前提: ${esc(proj.growth_assumption || '')}</div>` + renderTable(
+        const revSparkline = sparkline(proj.yearly.map(y => y.revenue), { color: '#4A9EFF', height: 40, showArea: true, label: '売上高推移予測' });
+        html += card('5年間収益予測', `<div class="text-xs text-gs-text-muted/60 mb-3 italic">前提: ${esc(proj.growth_assumption || '')}</div>${revSparkline}<div class="mt-3">${renderTable(
             [{ label: '年度' }, { label: '売上高', align: 'right' }, { label: '成長率', align: 'right' }],
             proj.yearly.map(y => [{ text: y.year }, { html: formatCurrency(y.revenue) }, { text: y.growth_rate_pct + '%' }]),
-        ));
+        )}</div>`);
     }
+
+    // FCF projection with sparkline
     const fcf = d.fcf_projections || {};
     if (fcf.yearly) {
-        html += card('FCF予測', `<div class="text-xs text-gs-text-muted/60 mb-3 italic">FCFマージン: ${fcf.fcf_margin_assumption}%</div>` + renderTable(
+        const fcfSparkline = sparkline(fcf.yearly.map(y => y.fcf), { color: '#4ade80', height: 40, showArea: true, label: 'FCF推移予測' });
+        html += card('FCF予測', `<div class="text-xs text-gs-text-muted/60 mb-3 italic">FCFマージン: ${fcf.fcf_margin_assumption}%</div>${fcfSparkline}<div class="mt-3">${renderTable(
             [{ label: '年度' }, { label: 'FCF', align: 'right' }, { label: 'マージン', align: 'right' }],
             fcf.yearly.map(y => [{ text: y.year }, { html: formatCurrency(y.fcf) }, { text: y.fcf_margin_pct + '%' }]),
-        ));
+        )}</div>`);
     }
     const wacc = d.wacc || {};
     html += card('WACC推定', `${metric('WACC', wacc.wacc_pct ? wacc.wacc_pct + '%' : 'N/A')}${metric('株主資本コスト', wacc.cost_of_equity_pct ? wacc.cost_of_equity_pct + '%' : 'N/A')}${metric('負債コスト', wacc.cost_of_debt_pct ? wacc.cost_of_debt_pct + '%' : 'N/A')}${metric('ベータ', wacc.beta ?? 'N/A')}${metric('リスクフリーレート', wacc.risk_free_rate_pct ? wacc.risk_free_rate_pct + '%' : 'N/A')}${metric('D/E比率', wacc.debt_equity_ratio ?? 'N/A')}`);
@@ -466,24 +648,11 @@ function renderMorganDCF(d) {
     html += card('ターミナルバリュー', `<h4 class="text-xs text-gs-accent mb-2 font-semibold">${esc(tv.perpetuity_growth?.method || '')}</h4>${metric('ターミナルバリュー', formatCurrency(tv.perpetuity_growth?.terminal_value))}${metric('永続成長率', tv.perpetuity_growth?.growth_rate_pct ? tv.perpetuity_growth.growth_rate_pct + '%' : 'N/A')}<h4 class="text-xs text-gs-accent mb-2 mt-4 font-semibold">${esc(tv.exit_multiple?.method || '')}</h4>${metric('ターミナルバリュー', formatCurrency(tv.exit_multiple?.terminal_value))}`);
     const val = d.valuation || {};
     html += card('企業価値・株式価値', `${metric('FCF現在価値合計', formatCurrency(val.total_pv_fcf))}${metric('TV現在価値（永続成長）', formatCurrency(val.pv_terminal_perpetuity))}${metric('TV現在価値（マルチプル）', formatCurrency(val.pv_terminal_multiple))}${metric('純有利子負債', formatCurrency(val.net_debt))}<div class="border-t border-gs-border/40 mt-3 pt-3">${metric('1株価値（永続成長法）', val.per_share_perpetuity ? '&yen;' + formatNumber(val.per_share_perpetuity) : 'N/A')}${metric('1株価値（マルチプル法）', val.per_share_multiple ? '&yen;' + formatNumber(val.per_share_multiple) : 'N/A')}${metric('1株価値（平均）', val.per_share_average ? '&yen;' + formatNumber(val.per_share_average) : 'N/A')}</div>`);
+
+    // Enhanced sensitivity analysis with heatmap
     const sens = d.sensitivity || {};
     if (sens.table?.length > 0) {
-        const gh = (sens.growth_range || []);
-        let sensBody = '<div class="overflow-x-auto -mx-1"><table class="w-full text-xs"><thead><tr class="text-gs-text-muted border-b border-gs-border"><th class="py-2 px-1 text-left font-medium">WACC</th>';
-        gh.forEach(g => { sensBody += `<th class="text-right py-2 px-1 font-medium">g=${esc(g)}</th>`; });
-        sensBody += '</tr></thead><tbody>';
-        sens.table.forEach(row => {
-            sensBody += `<tr class="border-b border-gs-border/20 hover:bg-gs-border/5 transition-colors"><td class="py-2 px-1 font-medium text-white">${row.wacc_pct}%</td>`;
-            gh.forEach(g => {
-                const key = `g_${g}`;
-                const sv = row[key];
-                const cl = d.current_price && sv > d.current_price ? 'text-green-400' : 'text-red-400';
-                sensBody += `<td class="text-right py-2 px-1 ${cl} font-medium">&yen;${formatNumber(sv)}</td>`;
-            });
-            sensBody += '</tr>';
-        });
-        sensBody += `</tbody></table></div><div class="text-xs text-gs-text-muted/60 mt-3 italic">${esc(sens.note || '')}</div>`;
-        html += card('感度分析テーブル', sensBody);
+        html += card('感度分析ヒートマップ', heatmapTable(sens, d.current_price));
     }
     html += '</div>';
     return html;

@@ -1,5 +1,7 @@
 /**
- * GSSS - GitHub Pages 版 メインアプリケーション (Polished Design)
+ * GSSS - GitHub Pages 版 メインアプリケーション (Advanced)
+ *
+ * 機能: 検索履歴, キーボードショートカット, スケルトンローダー, SVGスパークライン対応
  */
 
 // ── 分析エンジン定義 ────────────────────────────────
@@ -21,6 +23,138 @@ let currentTicker = '';
 let currentAnalyzer = '';
 let cachedStockData = null;
 let statusTimer = null;
+const HISTORY_KEY = 'gsss_search_history';
+const MAX_HISTORY = 8;
+
+// ══════════════════════════════════════════════════════
+// 検索履歴
+// ══════════════════════════════════════════════════════
+function getSearchHistory() {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
+    catch { return []; }
+}
+
+function addToHistory(ticker, name) {
+    const history = getSearchHistory().filter(h => h.ticker !== ticker);
+    history.unshift({ ticker, name, ts: Date.now() });
+    if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch {}
+    renderSearchHistory();
+}
+
+function removeFromHistory(ticker) {
+    const history = getSearchHistory().filter(h => h.ticker !== ticker);
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch {}
+    renderSearchHistory();
+}
+
+function clearSearchHistory() {
+    try { localStorage.removeItem(HISTORY_KEY); } catch {}
+    renderSearchHistory();
+}
+
+function renderSearchHistory() {
+    const container = document.getElementById('searchHistory');
+    const chips = document.getElementById('searchHistoryChips');
+    const history = getSearchHistory();
+
+    if (history.length === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+    container.classList.remove('hidden');
+    chips.innerHTML = history.map(h => {
+        const code = h.ticker.replace('.T', '');
+        const label = h.name ? `${code} ${h.name.substring(0, 6)}` : code;
+        return `<div class="history-chip ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg flex items-center gap-1.5 cursor-pointer" onclick="quickTicker('${esc(code)}')">
+            <span>${esc(label)}</span>
+            <button class="close-btn text-gs-text-muted/40 hover:text-red-400 text-sm leading-none" onclick="event.stopPropagation();removeFromHistory('${esc(h.ticker)}')">&times;</button>
+        </div>`;
+    }).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// キーボードショートカット
+// ══════════════════════════════════════════════════════
+function showShortcutsModal() {
+    document.getElementById('shortcutsModal').classList.remove('hidden');
+}
+
+function hideShortcutsModal() {
+    document.getElementById('shortcutsModal').classList.add('hidden');
+}
+
+function setupKeyboardShortcuts() {
+    document.addEventListener('keydown', e => {
+        // Ignore if typing in input/select/textarea
+        const tag = document.activeElement?.tagName;
+        if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
+            if (e.key === 'Escape') { document.activeElement.blur(); return; }
+            return;
+        }
+
+        switch (e.key) {
+            case '/':
+                e.preventDefault();
+                document.getElementById('tickerInput').focus();
+                break;
+            case '?':
+                e.preventDefault();
+                showShortcutsModal();
+                break;
+            case 'Escape':
+                hideShortcutsModal();
+                break;
+            case 'r':
+            case 'R':
+                const results = document.getElementById('results');
+                if (!results.classList.contains('hidden')) {
+                    results.scrollIntoView({ behavior: 'smooth' });
+                }
+                break;
+            case 't':
+            case 'T':
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                break;
+        }
+    });
+}
+
+// ══════════════════════════════════════════════════════
+// スケルトンローダー
+// ══════════════════════════════════════════════════════
+function showSkeletonLoader() {
+    const results = document.getElementById('results');
+    results.innerHTML = `
+        <div class="fade-in">
+            <!-- Header skeleton -->
+            <div class="card-elevated rounded-2xl p-6 mb-6">
+                <div class="flex items-center gap-4">
+                    <div class="skeleton w-12 h-12 rounded-xl"></div>
+                    <div class="flex-1">
+                        <div class="skeleton h-6 w-48 mb-2"></div>
+                        <div class="skeleton h-4 w-32"></div>
+                    </div>
+                </div>
+                <div class="skeleton h-10 w-40 mt-4"></div>
+            </div>
+            <!-- Cards skeleton -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                ${[1,2,3,4].map(() => `
+                    <div class="card-elevated rounded-2xl p-5">
+                        <div class="skeleton h-4 w-32 mb-4"></div>
+                        <div class="space-y-3">
+                            <div class="flex justify-between"><div class="skeleton h-3 w-24"></div><div class="skeleton h-3 w-16"></div></div>
+                            <div class="flex justify-between"><div class="skeleton h-3 w-20"></div><div class="skeleton h-3 w-20"></div></div>
+                            <div class="flex justify-between"><div class="skeleton h-3 w-28"></div><div class="skeleton h-3 w-12"></div></div>
+                            <div class="skeleton h-2 w-full mt-2"></div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>`;
+    results.classList.remove('hidden');
+}
 
 // ── 初期化 ──────────────────────────────────────────
 function init() {
@@ -45,6 +179,10 @@ function init() {
     document.getElementById('tickerInput').addEventListener('keydown', e => {
         if (e.key === 'Enter') searchStock();
     });
+
+    // Initialize features
+    renderSearchHistory();
+    setupKeyboardShortcuts();
 }
 
 // ── 銘柄検索 ────────────────────────────────────────
@@ -65,8 +203,10 @@ async function searchStock() {
     try {
         cachedStockData = await StockFetcher.fetchStockData(ticker);
         currentTicker = ticker;
-        nameEl.textContent = cachedStockData.info.longName;
+        const name = cachedStockData.info.longName;
+        nameEl.textContent = name;
         tickerEl.textContent = `(${ticker})`;
+        addToHistory(ticker, name);
 
         if (cachedStockData._dataSource === 'chart_only') {
             showStatus('基本データ取得成功（一部ファンダメンタルデータは利用不可）', 'warning');
@@ -81,6 +221,7 @@ async function searchStock() {
             if (results.length > 0) {
                 nameEl.textContent = results[0].name;
                 tickerEl.textContent = `(${ticker})`;
+                addToHistory(ticker, results[0].name);
                 showStatus('銘柄が見つかりました。分析メニューをお試しください。', 'info');
             } else {
                 nameEl.textContent = ticker;
@@ -160,9 +301,9 @@ async function executeAnalysis(analyzerType, params) {
     const loadingText = document.getElementById('loadingText');
     const info = ANALYZERS[analyzerType];
 
+    // Show skeleton loader instead of spinner for better UX
     loading.classList.remove('hidden');
-    results.classList.add('hidden');
-    results.innerHTML = '';
+    showSkeletonLoader();
     loadingText.textContent = 'データを取得中...';
     loading.scrollIntoView({ behavior: 'smooth' });
 
@@ -199,7 +340,8 @@ async function executeAnalysis(analyzerType, params) {
             </div>`;
         }
 
-        results.innerHTML = dataNotice + renderAnalysis(analyzerType, data, info);
+        // Pass cachedStockData for sparklines and 52-week range
+        results.innerHTML = dataNotice + renderAnalysis(analyzerType, data, info, cachedStockData);
         results.classList.remove('hidden');
         results.scrollIntoView({ behavior: 'smooth' });
         showStatus('分析完了', 'success');

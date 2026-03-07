@@ -11,7 +11,13 @@
                 <p class="text-gs-text-muted text-[10px] sm:text-xs hidden sm:block tracking-wide">Goldman Sachs Style Stock Screener</p>
             </div>
         </div>
-        <div class="text-gs-text-muted text-[10px] sm:text-xs text-right leading-tight">日本株式<br class="sm:hidden"><span class="hidden sm:inline"> </span>プロフェッショナル分析</div>
+        <div class="flex items-center gap-2 sm:gap-3">
+            <button onclick="showShortcutsModal()" class="hidden sm:flex items-center gap-1.5 text-gs-text-muted/50 hover:text-gs-text-muted transition-colors text-xs" title="キーボードショートカット">
+                <span class="kbd">/</span>
+                <span class="text-[10px]">検索</span>
+            </button>
+            <div class="text-gs-text-muted text-[10px] sm:text-xs text-right leading-tight">日本株式<br class="sm:hidden"><span class="hidden sm:inline"> </span>プロフェッショナル分析</div>
+        </div>
     </div>
 </header>
 
@@ -38,11 +44,19 @@
                 </div>
             </div>
             <div id="stockInfo" class="mt-3 hidden">
-                <div class="flex items-center gap-2 text-sm bg-green-900/20 border border-green-700/20 rounded-lg px-3 py-2">
-                    <span class="inline-block w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                    <span id="stockName" class="text-white font-medium"></span>
-                    <span id="stockTicker" class="text-gs-text-muted"></span>
+                <div class="flex items-center gap-2 text-xs sm:text-sm bg-green-900/20 border border-green-700/20 rounded-lg px-3 py-2">
+                    <span class="inline-block w-2 h-2 bg-green-400 rounded-full flex-shrink-0 animate-pulse"></span>
+                    <span id="stockName" class="text-white font-medium truncate"></span>
+                    <span id="stockTicker" class="text-gs-text-muted flex-shrink-0"></span>
                 </div>
+            </div>
+            <!-- Search History -->
+            <div id="searchHistory" class="mt-3 hidden">
+                <div class="flex items-center gap-1.5 mb-1.5">
+                    <span class="text-[10px] text-gs-text-muted/40">最近の検索:</span>
+                    <button onclick="clearSearchHistory()" class="text-[10px] text-gs-text-muted/30 hover:text-red-400 transition-colors ml-auto">クリア</button>
+                </div>
+                <div id="searchHistoryChips" class="flex flex-wrap gap-1.5"></div>
             </div>
         </div>
     </section>
@@ -113,6 +127,23 @@
         <p class="text-gs-text-muted/30 text-[10px] sm:text-xs mt-1">データはyfinanceより取得しています。</p>
     </div>
 </footer>
+
+<!-- Keyboard Shortcuts Modal -->
+<div id="shortcutsModal" class="hidden fixed inset-0 modal-overlay z-[100] flex items-center justify-center p-4" onclick="if(event.target===this)hideShortcutsModal()">
+    <div class="card-elevated rounded-2xl p-6 sm:p-8 max-w-sm w-full fade-in">
+        <div class="flex items-center justify-between mb-5">
+            <h3 class="text-white font-semibold text-base">キーボードショートカット</h3>
+            <button onclick="hideShortcutsModal()" class="text-gs-text-muted hover:text-white transition-colors text-lg">&times;</button>
+        </div>
+        <div class="space-y-3">
+            <div class="flex justify-between items-center"><span class="text-gs-text-muted text-sm">検索にフォーカス</span><span class="kbd">/</span></div>
+            <div class="flex justify-between items-center"><span class="text-gs-text-muted text-sm">モーダルを閉じる</span><span class="kbd">Esc</span></div>
+            <div class="flex justify-between items-center"><span class="text-gs-text-muted text-sm">ショートカット表示</span><span class="kbd">?</span></div>
+            <div class="flex justify-between items-center"><span class="text-gs-text-muted text-sm">結果までスクロール</span><span class="kbd">R</span></div>
+            <div class="flex justify-between items-center"><span class="text-gs-text-muted text-sm">ページトップへ</span><span class="kbd">T</span></div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
