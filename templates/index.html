@@ -1,67 +1,74 @@
 {% extends "base.html" %}
 
 {% block content %}
-<!-- ヘッダー -->
-<header class="bg-gs-navy/80 backdrop-blur-md border-b border-gs-border sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-            <div class="w-8 h-8 bg-gs-gold rounded flex items-center justify-center text-gs-dark font-bold text-sm">GS</div>
+<!-- Header -->
+<header class="header-glass border-b border-gs-border/50 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between">
+        <div class="flex items-center gap-2.5 sm:gap-3">
+            <div class="logo-badge w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center text-gs-darker font-bold text-xs sm:text-sm flex-shrink-0 tracking-tight">GS</div>
             <div>
-                <h1 class="text-white font-semibold text-lg leading-tight">GSSS</h1>
-                <p class="text-gs-text/60 text-xs">Goldman Sachs Style Stock Screener</p>
+                <h1 class="text-white font-bold text-base sm:text-lg leading-tight tracking-tight">GSSS</h1>
+                <p class="text-gs-text-muted text-[10px] sm:text-xs hidden sm:block tracking-wide">Goldman Sachs Style Stock Screener</p>
             </div>
         </div>
-        <div class="text-gs-text/60 text-xs">日本株式プロフェッショナル分析ツール</div>
+        <div class="text-gs-text-muted text-[10px] sm:text-xs text-right leading-tight">日本株式<br class="sm:hidden"><span class="hidden sm:inline"> </span>プロフェッショナル分析</div>
     </div>
 </header>
 
-<main class="max-w-7xl mx-auto px-4 py-8">
-    <!-- 銘柄入力セクション -->
-    <section class="mb-10">
-        <div class="bg-gs-card border border-gs-border rounded-xl p-6">
-            <h2 class="text-white font-semibold text-lg mb-4">銘柄を入力してください</h2>
-            <div class="flex gap-4 items-end flex-wrap">
+<main class="max-w-7xl mx-auto px-3 sm:px-6 py-5 sm:py-10 relative z-10">
+
+    <!-- Stock Input -->
+    <section class="mb-6 sm:mb-12">
+        <div class="card-elevated rounded-2xl p-4 sm:p-7">
+            <div class="flex items-center gap-2 mb-4 sm:mb-5">
+                <div class="w-1 h-5 bg-gs-gold rounded-full"></div>
+                <h2 class="text-white font-semibold text-base sm:text-lg">銘柄を入力</h2>
+            </div>
+            <div class="flex gap-2.5 sm:gap-4 items-end flex-wrap">
                 <div class="flex-1 min-w-[200px]">
-                    <label class="block text-sm text-gs-text/70 mb-1">銘柄コード / 銘柄名</label>
+                    <label class="block text-xs sm:text-sm text-gs-text-muted mb-1.5">銘柄コード / 銘柄名</label>
                     <input type="text" id="tickerInput"
-                        class="w-full bg-gs-dark border border-gs-border rounded-lg px-4 py-3 text-white placeholder-gs-text/40 focus:border-gs-accent focus:outline-none focus:ring-1 focus:ring-gs-accent"
+                        class="input-glow w-full bg-gs-darker border border-gs-border rounded-xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-white placeholder-gs-text-muted/50 focus:border-gs-accent focus:outline-none text-base transition-all duration-200"
                         placeholder="例: 7203（トヨタ）, 9984（ソフトバンクG）, 6758（ソニー）">
                 </div>
                 <div>
-                    <button onclick="searchStock()" class="bg-gs-accent hover:bg-gs-accent/80 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                    <button onclick="searchStock()" class="btn-primary text-white px-5 sm:px-7 py-2.5 sm:py-3 rounded-xl font-medium whitespace-nowrap text-sm sm:text-base">
                         銘柄確認
                     </button>
                 </div>
             </div>
             <div id="stockInfo" class="mt-3 hidden">
-                <div class="flex items-center gap-2 text-sm">
-                    <span class="inline-block w-2 h-2 bg-green-400 rounded-full"></span>
+                <div class="flex items-center gap-2 text-sm bg-green-900/20 border border-green-700/20 rounded-lg px-3 py-2">
+                    <span class="inline-block w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
                     <span id="stockName" class="text-white font-medium"></span>
-                    <span id="stockTicker" class="text-gs-text/60"></span>
+                    <span id="stockTicker" class="text-gs-text-muted"></span>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- 分析メニュー -->
-    <section class="mb-10">
-        <h2 class="text-white font-semibold text-lg mb-4">分析メニュー</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    <!-- Analysis Menu -->
+    <section class="mb-6 sm:mb-12">
+        <div class="flex items-center gap-2 mb-4 sm:mb-5">
+            <div class="w-1 h-5 bg-gs-accent rounded-full"></div>
+            <h2 class="text-white font-semibold text-base sm:text-lg">分析メニュー</h2>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             {% for key, analyzer in analyzers.items() %}
-            <div class="analyzer-card bg-gs-card border border-gs-border rounded-xl p-5 cursor-pointer"
+            <div class="analyzer-card bg-gs-card rounded-2xl p-4 sm:p-5 cursor-pointer"
                  onclick="runAnalysis('{{ key }}')"
                  data-analyzer="{{ key }}"
                  data-needs-ticker="{{ 'true' if analyzer.needs_ticker else 'false' }}">
                 <div class="flex items-start gap-3">
-                    <span class="text-2xl">{{ analyzer.icon }}</span>
+                    <div class="text-2xl flex-shrink-0 mt-0.5">{{ analyzer.icon }}</div>
                     <div class="flex-1">
-                        <h3 class="text-white font-medium text-sm mb-1">{{ analyzer.short }}</h3>
-                        <p class="text-gs-text/60 text-xs leading-relaxed">{{ analyzer.description }}</p>
+                        <h3 class="text-white font-semibold text-sm mb-1 tracking-tight">{{ analyzer.short }}</h3>
+                        <p class="text-gs-text-muted text-xs leading-relaxed">{{ analyzer.description }}</p>
                     </div>
                 </div>
                 {% if not analyzer.needs_ticker %}
                 <div class="mt-3">
-                    <span class="text-xs bg-gs-navy/50 text-gs-accent px-2 py-0.5 rounded">銘柄コード不要</span>
+                    <span class="badge-no-ticker text-[10px] text-gs-accent px-2.5 py-1 rounded-md font-medium inline-block">銘柄コード不要</span>
                 </div>
                 {% endif %}
             </div>
@@ -69,34 +76,41 @@
         </div>
     </section>
 
-    <!-- パラメータ入力（条件付き表示） -->
-    <div id="paramsSection" class="mb-8 hidden">
-        <div class="bg-gs-card border border-gs-border rounded-xl p-6">
-            <h3 class="text-white font-semibold mb-4" id="paramsTitle">追加パラメータ</h3>
-            <div id="paramsContent" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
-            <div class="mt-4">
-                <button onclick="submitWithParams()" class="bg-gs-gold hover:bg-gs-gold/80 text-gs-dark px-6 py-2 rounded-lg font-medium transition-colors">
+    <!-- Parameters -->
+    <div id="paramsSection" class="mb-6 sm:mb-10 hidden">
+        <div class="card-elevated rounded-2xl p-4 sm:p-7">
+            <div class="flex items-center gap-2 mb-4 sm:mb-5">
+                <div class="w-1 h-5 bg-gs-gold rounded-full"></div>
+                <h3 class="text-white font-semibold text-sm sm:text-base" id="paramsTitle">追加パラメータ</h3>
+            </div>
+            <div id="paramsContent" class="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4"></div>
+            <div class="mt-5">
+                <button onclick="submitWithParams()" class="btn-gold w-full sm:w-auto text-gs-darker px-7 py-2.5 sm:py-3 rounded-xl font-semibold text-base">
                     分析開始
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- ローディング -->
-    <div id="loading" class="hidden text-center py-16">
-        <div class="loader mx-auto mb-4"></div>
-        <p class="text-gs-text/70" id="loadingText">分析中...</p>
+    <!-- Loading -->
+    <div id="loading" class="hidden text-center py-16 sm:py-24">
+        <div class="loader mx-auto mb-5"></div>
+        <p class="text-gs-text-muted text-sm loader-pulse" id="loadingText">分析中...</p>
     </div>
 
-    <!-- 分析結果 -->
+    <!-- Results -->
     <div id="results" class="hidden fade-in"></div>
 </main>
 
-<!-- フッター -->
-<footer class="border-t border-gs-border mt-16 py-6">
-    <div class="max-w-7xl mx-auto px-4 text-center text-gs-text/40 text-xs">
-        <p>GSSS - Goldman Sachs Style Stock Screener | 投資は自己責任で行ってください</p>
-        <p class="mt-1">本ツールの分析結果は投資助言ではありません。データはyfinanceより取得しています。</p>
+<!-- Footer -->
+<footer class="border-t border-gs-border/40 mt-16 sm:mt-24 py-6 sm:py-8 relative z-10">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 text-center">
+        <div class="flex items-center justify-center gap-2 mb-3">
+            <div class="logo-badge w-5 h-5 rounded flex items-center justify-center text-gs-darker font-bold text-[8px]">GS</div>
+            <span class="text-gs-text-muted/60 text-xs font-medium tracking-wide">GSSS</span>
+        </div>
+        <p class="text-gs-text-muted/40 text-[10px] sm:text-xs leading-relaxed">投資は自己責任で行ってください。本ツールの分析結果は投資助言ではありません。</p>
+        <p class="text-gs-text-muted/30 text-[10px] sm:text-xs mt-1">データはyfinanceより取得しています。</p>
     </div>
 </footer>
 {% endblock %}

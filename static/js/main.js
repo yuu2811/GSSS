@@ -1,9 +1,10 @@
 /**
- * GSSS - メインJavaScript
+ * GSSS - メインJavaScript (Polished Design - Flask版)
  */
 
 let currentTicker = '';
 let currentAnalyzer = '';
+let statusTimer = null;
 
 // 銘柄検索
 async function searchStock() {
@@ -19,9 +20,11 @@ async function searchStock() {
             document.getElementById('stockName').textContent = stock.name;
             document.getElementById('stockTicker').textContent = `(${stock.ticker})`;
             document.getElementById('stockInfo').classList.remove('hidden');
+            showStatus('データ取得完了', 'success');
         }
     } catch (e) {
         console.error('検索エラー:', e);
+        showStatus('銘柄検索に失敗しました', 'error');
     }
 }
 
@@ -38,7 +41,7 @@ async function runAnalysis(analyzerType) {
     if (needsTicker) {
         const input = document.getElementById('tickerInput').value.trim();
         if (!input && !currentTicker) {
-            alert('銘柄コードを入力してください');
+            showStatus('銘柄コードを入力してください', 'error');
             document.getElementById('tickerInput').focus();
             return;
         }
@@ -47,7 +50,6 @@ async function runAnalysis(analyzerType) {
         }
     }
 
-    // パラメータが必要な分析
     if (analyzerType === 'blackrock' || analyzerType === 'vanguard') {
         showParamsForm(analyzerType);
         return;
@@ -66,32 +68,30 @@ function showParamsForm(analyzerType) {
 
     section.classList.remove('hidden');
 
+    const inputClass = 'input-glow w-full bg-gs-darker border border-gs-border rounded-xl px-4 py-3 text-white focus:border-gs-accent focus:outline-none text-base transition-all duration-200';
+
     if (analyzerType === 'blackrock') {
         title.textContent = 'BlackRock 配当分析 - パラメータ設定';
         content.innerHTML = `
             <div>
-                <label class="block text-sm text-gs-text/70 mb-1">投資金額（円）</label>
-                <input type="number" id="param_investment_amount" value="1000000"
-                    class="w-full bg-gs-dark border border-gs-border rounded-lg px-4 py-2 text-white focus:border-gs-accent focus:outline-none">
+                <label class="block text-sm text-gs-text-muted mb-1.5">投資金額（円）</label>
+                <input type="number" id="param_investment_amount" value="1000000" class="${inputClass}">
             </div>
         `;
     } else if (analyzerType === 'vanguard') {
         title.textContent = 'Vanguard ETFポートフォリオ - パラメータ設定';
         content.innerHTML = `
             <div>
-                <label class="block text-sm text-gs-text/70 mb-1">年齢</label>
-                <input type="number" id="param_age" value="35"
-                    class="w-full bg-gs-dark border border-gs-border rounded-lg px-4 py-2 text-white focus:border-gs-accent focus:outline-none">
+                <label class="block text-sm text-gs-text-muted mb-1.5">年齢</label>
+                <input type="number" id="param_age" value="35" class="${inputClass}">
             </div>
             <div>
-                <label class="block text-sm text-gs-text/70 mb-1">投資金額（円）</label>
-                <input type="number" id="param_investment_amount" value="1000000"
-                    class="w-full bg-gs-dark border border-gs-border rounded-lg px-4 py-2 text-white focus:border-gs-accent focus:outline-none">
+                <label class="block text-sm text-gs-text-muted mb-1.5">投資金額（円）</label>
+                <input type="number" id="param_investment_amount" value="1000000" class="${inputClass}">
             </div>
             <div>
-                <label class="block text-sm text-gs-text/70 mb-1">リスクプロファイル</label>
-                <select id="param_risk_profile"
-                    class="w-full bg-gs-dark border border-gs-border rounded-lg px-4 py-2 text-white focus:border-gs-accent focus:outline-none">
+                <label class="block text-sm text-gs-text-muted mb-1.5">リスクプロファイル</label>
+                <select id="param_risk_profile" class="${inputClass}">
                     <option value="積極型">積極型</option>
                     <option value="やや積極型">やや積極型</option>
                     <option value="バランス型" selected>バランス型</option>
@@ -158,22 +158,53 @@ async function executeAnalysis(analyzerType, params) {
         results.innerHTML = renderAnalysis(analyzerType, data.data, data.analyzer_info);
         results.classList.remove('hidden');
         results.scrollIntoView({ behavior: 'smooth' });
+        showStatus('分析完了', 'success');
 
     } catch (e) {
         loading.classList.add('hidden');
         results.innerHTML = renderError('通信エラーが発生しました: ' + e.message);
         results.classList.remove('hidden');
+        showStatus('分析中にエラーが発生しました', 'error');
     }
 }
 
 // エラー表示
 function renderError(message) {
     return `
-        <div class="bg-red-900/30 border border-red-700/50 rounded-xl p-6 text-center">
-            <p class="text-red-400 font-medium">エラー</p>
-            <p class="text-red-300/80 mt-2">${escapeHtml(message)}</p>
+        <div class="bg-red-900/20 border border-red-700/30 rounded-2xl p-6 sm:p-8 text-center fade-in">
+            <div class="text-red-400 text-3xl mb-3">&#x26A0;</div>
+            <p class="text-red-400 font-semibold text-lg">エラー</p>
+            <p class="text-red-300/70 mt-2 text-sm leading-relaxed">${escapeHtml(message)}</p>
+            <button onclick="location.reload()" class="mt-5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 px-5 py-2.5 rounded-xl text-sm transition-colors font-medium">ページを再読み込み</button>
         </div>
     `;
+}
+
+// ステータス通知
+function showStatus(message, type = 'info') {
+    let el = document.getElementById('statusBar');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'statusBar';
+        document.body.appendChild(el);
+    }
+
+    const colors = {
+        info: 'bg-gs-accent/90 border-gs-accent/30',
+        success: 'bg-green-600/90 border-green-500/30',
+        warning: 'bg-yellow-600/90 border-yellow-500/30',
+        error: 'bg-red-600/90 border-red-500/30'
+    };
+    el.className = `status-toast fixed bottom-4 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-xl text-sm font-medium text-white transition-all duration-300 z-50 max-w-[90vw] text-center border ${colors[type] || colors.info}`;
+    el.textContent = message;
+    el.style.opacity = '1';
+    el.style.transform = 'translateX(-50%) translateY(0)';
+
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateX(-50%) translateY(8px)';
+    }, type === 'error' ? 5000 : 3000);
 }
 
 // HTMLエスケープ

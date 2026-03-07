@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#0A1628">
+    <meta name="theme-color" content="#070E1A">
     <meta name="description" content="GSSS - 日本株式プロフェッショナル分析ツール。10種類の投資銀行スタイル分析エンジンで日本株を徹底分析。">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -19,11 +19,17 @@
                     colors: {
                         'gs-navy': '#003A70',
                         'gs-gold': '#B5985A',
-                        'gs-dark': '#0A1628',
-                        'gs-card': '#111D33',
-                        'gs-border': '#1E3050',
+                        'gs-gold-light': '#D4B978',
+                        'gs-dark': '#070E1A',
+                        'gs-darker': '#040810',
+                        'gs-card': '#0D1825',
+                        'gs-card-hover': '#111F30',
+                        'gs-border': '#1A2D48',
+                        'gs-border-light': '#243A58',
                         'gs-text': '#C8D6E5',
+                        'gs-text-muted': '#7A8FA6',
                         'gs-accent': '#4A9EFF',
+                        'gs-accent-dim': '#2A6FCC',
                     }
                 }
             }
@@ -31,112 +37,283 @@
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Noto Sans JP', sans-serif; -webkit-font-smoothing: antialiased; }
-        .loader { border: 3px solid #1E3050; border-top: 3px solid #4A9EFF; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .fade-in { animation: fadeIn 0.4s ease-in; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        .analyzer-card { transition: all 0.15s ease; }
-        .analyzer-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(74, 158, 255, 0.12); }
-        .analyzer-card:active { transform: scale(0.98); }
-        .score-bar { transition: width 1s ease-out; }
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: #0A1628; }
-        ::-webkit-scrollbar-thumb { background: #1E3050; border-radius: 2px; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Noto Sans JP', 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Background subtle pattern */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background:
+                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 58, 112, 0.15), transparent),
+                radial-gradient(ellipse 60% 40% at 80% 100%, rgba(74, 158, 255, 0.04), transparent);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Header glass effect */
+        .header-glass {
+            background: linear-gradient(180deg, rgba(0, 58, 112, 0.85) 0%, rgba(0, 42, 82, 0.75) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+        }
+
+        /* Logo shimmer */
+        .logo-badge {
+            background: linear-gradient(135deg, #D4B978 0%, #B5985A 50%, #8B7342 100%);
+            box-shadow: 0 2px 8px rgba(181, 152, 90, 0.3);
+        }
+
+        /* Input glow on focus */
+        .input-glow:focus {
+            box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.15), 0 0 20px rgba(74, 158, 255, 0.08);
+        }
+
+        /* Card styles */
+        .card-elevated {
+            background: linear-gradient(180deg, rgba(13, 24, 37, 0.95) 0%, rgba(10, 20, 32, 0.98) 100%);
+            border: 1px solid rgba(26, 45, 72, 0.6);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Analyzer card hover */
+        .analyzer-card {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(26, 45, 72, 0.5);
+        }
+        .analyzer-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(74, 158, 255, 0.25);
+            box-shadow: 0 8px 30px rgba(74, 158, 255, 0.1), 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+        .analyzer-card:active {
+            transform: scale(0.98) translateY(0);
+            transition-duration: 0.1s;
+        }
+
+        /* Button styles */
+        .btn-primary {
+            background: linear-gradient(135deg, #4A9EFF 0%, #3B82F6 100%);
+            box-shadow: 0 2px 8px rgba(74, 158, 255, 0.25);
+            transition: all 0.2s ease;
+        }
+        .btn-primary:hover {
+            box-shadow: 0 4px 16px rgba(74, 158, 255, 0.35);
+            filter: brightness(1.1);
+        }
+        .btn-primary:active {
+            filter: brightness(0.95);
+            box-shadow: 0 1px 4px rgba(74, 158, 255, 0.2);
+        }
+
+        .btn-gold {
+            background: linear-gradient(135deg, #D4B978 0%, #B5985A 100%);
+            box-shadow: 0 2px 8px rgba(181, 152, 90, 0.25);
+            transition: all 0.2s ease;
+        }
+        .btn-gold:hover {
+            box-shadow: 0 4px 16px rgba(181, 152, 90, 0.35);
+            filter: brightness(1.1);
+        }
+
+        /* Loader */
+        .loader {
+            width: 44px; height: 44px;
+            border: 3px solid rgba(26, 45, 72, 0.5);
+            border-top-color: #4A9EFF;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        .loader-pulse {
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+
+        /* Fade in */
+        .fade-in { animation: fadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Staggered fade */
+        .stagger-1 { animation-delay: 0.05s; }
+        .stagger-2 { animation-delay: 0.1s; }
+        .stagger-3 { animation-delay: 0.15s; }
+        .stagger-4 { animation-delay: 0.2s; }
+
+        /* Score bar */
+        .score-bar { transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1); }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(26, 45, 72, 0.8); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(36, 58, 88, 0.9); }
+
+        /* Quick ticker chip */
+        .ticker-chip {
+            transition: all 0.15s ease;
+            border: 1px solid transparent;
+        }
+        .ticker-chip:hover {
+            border-color: rgba(74, 158, 255, 0.3);
+            background: rgba(74, 158, 255, 0.08);
+            color: #fff;
+        }
+
+        /* Section divider */
+        .section-title {
+            position: relative;
+            display: inline-block;
+        }
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 32px;
+            height: 2px;
+            background: linear-gradient(90deg, #B5985A, transparent);
+            border-radius: 1px;
+        }
+
+        /* Status notification */
+        .status-toast {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        /* Banner card glow */
+        .banner-glow {
+            background: linear-gradient(135deg, rgba(0, 58, 112, 0.6) 0%, rgba(13, 24, 37, 0.9) 100%);
+            border: 1px solid rgba(74, 158, 255, 0.2);
+            box-shadow: inset 0 1px 0 rgba(74, 158, 255, 0.1);
+        }
+
+        /* Mobile optimizations */
         @media (max-width: 640px) {
             .analyzer-card { min-height: 80px; }
             input, select, button { font-size: 16px !important; }
         }
+
         body { padding-bottom: env(safe-area-inset-bottom); }
         header { padding-top: env(safe-area-inset-top); }
+
+        /* No-ticker badge */
+        .badge-no-ticker {
+            background: linear-gradient(135deg, rgba(0, 58, 112, 0.5) 0%, rgba(0, 42, 82, 0.3) 100%);
+            border: 1px solid rgba(74, 158, 255, 0.15);
+        }
     </style>
 </head>
-<body class="bg-gs-dark text-gs-text min-h-screen">
+<body class="bg-gs-dark text-gs-text min-h-screen relative">
 
-<!-- ヘッダー -->
-<header class="bg-gs-navy/80 backdrop-blur-md border-b border-gs-border sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between">
-        <div class="flex items-center gap-2 sm:gap-3">
-            <div class="w-7 h-7 sm:w-8 sm:h-8 bg-gs-gold rounded flex items-center justify-center text-gs-dark font-bold text-xs sm:text-sm flex-shrink-0">GS</div>
+<!-- Header -->
+<header class="header-glass border-b border-gs-border/50 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between">
+        <div class="flex items-center gap-2.5 sm:gap-3">
+            <div class="logo-badge w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center text-gs-darker font-bold text-xs sm:text-sm flex-shrink-0 tracking-tight">GS</div>
             <div>
-                <h1 class="text-white font-semibold text-base sm:text-lg leading-tight">GSSS</h1>
-                <p class="text-gs-text/60 text-[10px] sm:text-xs hidden sm:block">Goldman Sachs Style Stock Screener</p>
+                <h1 class="text-white font-bold text-base sm:text-lg leading-tight tracking-tight">GSSS</h1>
+                <p class="text-gs-text-muted text-[10px] sm:text-xs hidden sm:block tracking-wide">Goldman Sachs Style Stock Screener</p>
             </div>
         </div>
-        <div class="text-gs-text/60 text-[10px] sm:text-xs text-right">日本株式<br class="sm:hidden">プロフェッショナル分析</div>
+        <div class="flex items-center gap-3">
+            <div class="text-gs-text-muted text-[10px] sm:text-xs text-right leading-tight">日本株式<br class="sm:hidden"><span class="hidden sm:inline"> </span>プロフェッショナル分析</div>
+        </div>
     </div>
 </header>
 
-<main class="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+<main class="max-w-7xl mx-auto px-3 sm:px-6 py-5 sm:py-10 relative z-10">
 
-    <!-- 銘柄入力 -->
-    <section class="mb-6 sm:mb-10">
-        <div class="bg-gs-card border border-gs-border rounded-xl p-4 sm:p-6">
-            <h2 class="text-white font-semibold text-base sm:text-lg mb-3 sm:mb-4">銘柄を入力</h2>
-            <div class="flex gap-2 sm:gap-4 items-end">
+    <!-- Stock Input -->
+    <section class="mb-6 sm:mb-12">
+        <div class="card-elevated rounded-2xl p-4 sm:p-7">
+            <div class="flex items-center gap-2 mb-4 sm:mb-5">
+                <div class="w-1 h-5 bg-gs-gold rounded-full"></div>
+                <h2 class="text-white font-semibold text-base sm:text-lg">銘柄を入力</h2>
+            </div>
+            <div class="flex gap-2.5 sm:gap-4 items-end">
                 <div class="flex-1">
-                    <label for="tickerInput" class="block text-xs sm:text-sm text-gs-text/70 mb-1">銘柄コード</label>
+                    <label for="tickerInput" class="block text-xs sm:text-sm text-gs-text-muted mb-1.5">銘柄コード</label>
                     <input type="text" id="tickerInput" inputmode="numeric" autocomplete="off"
-                        class="w-full bg-gs-dark border border-gs-border rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-white placeholder-gs-text/40 focus:border-gs-accent focus:outline-none focus:ring-1 focus:ring-gs-accent text-base"
+                        class="input-glow w-full bg-gs-darker border border-gs-border rounded-xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-white placeholder-gs-text-muted/50 focus:border-gs-accent focus:outline-none text-base transition-all duration-200"
                         placeholder="例: 7203, 9984, 6758">
                 </div>
-                <button onclick="searchStock()" class="bg-gs-accent hover:bg-gs-accent/80 active:bg-gs-accent/60 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0">
+                <button onclick="searchStock()" class="btn-primary text-white px-5 sm:px-7 py-2.5 sm:py-3 rounded-xl font-medium whitespace-nowrap text-sm sm:text-base flex-shrink-0">
                     確認
                 </button>
             </div>
-            <div id="stockInfo" class="mt-2 hidden">
-                <div class="flex items-center gap-2 text-xs sm:text-sm">
-                    <span class="inline-block w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></span>
+            <div id="stockInfo" class="mt-3 hidden">
+                <div class="flex items-center gap-2 text-xs sm:text-sm bg-green-900/20 border border-green-700/20 rounded-lg px-3 py-2">
+                    <span class="inline-block w-2 h-2 bg-green-400 rounded-full flex-shrink-0 animate-pulse"></span>
                     <span id="stockName" class="text-white font-medium truncate"></span>
-                    <span id="stockTicker" class="text-gs-text/60 flex-shrink-0"></span>
+                    <span id="stockTicker" class="text-gs-text-muted flex-shrink-0"></span>
                 </div>
             </div>
-            <div class="mt-3 flex flex-wrap gap-1.5">
-                <span class="text-xs text-gs-text/40">例:</span>
-                <button onclick="quickTicker('7203')" class="text-xs bg-gs-dark/80 text-gs-text/60 px-2 py-0.5 rounded hover:text-white transition-colors">7203 トヨタ</button>
-                <button onclick="quickTicker('9984')" class="text-xs bg-gs-dark/80 text-gs-text/60 px-2 py-0.5 rounded hover:text-white transition-colors">9984 SBG</button>
-                <button onclick="quickTicker('6758')" class="text-xs bg-gs-dark/80 text-gs-text/60 px-2 py-0.5 rounded hover:text-white transition-colors">6758 ソニー</button>
-                <button onclick="quickTicker('7974')" class="text-xs bg-gs-dark/80 text-gs-text/60 px-2 py-0.5 rounded hover:text-white transition-colors">7974 任天堂</button>
+            <div class="mt-3.5 flex flex-wrap items-center gap-1.5">
+                <span class="text-xs text-gs-text-muted/50 mr-0.5">例:</span>
+                <button onclick="quickTicker('7203')" class="ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg">7203 トヨタ</button>
+                <button onclick="quickTicker('9984')" class="ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg">9984 SBG</button>
+                <button onclick="quickTicker('6758')" class="ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg">6758 ソニー</button>
+                <button onclick="quickTicker('7974')" class="ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg">7974 任天堂</button>
             </div>
         </div>
     </section>
 
-    <!-- 分析メニュー -->
-    <section class="mb-6 sm:mb-10">
-        <h2 class="text-white font-semibold text-base sm:text-lg mb-3 sm:mb-4">分析メニュー</h2>
+    <!-- Analysis Menu -->
+    <section class="mb-6 sm:mb-12">
+        <div class="flex items-center gap-2 mb-4 sm:mb-5">
+            <div class="w-1 h-5 bg-gs-accent rounded-full"></div>
+            <h2 class="text-white font-semibold text-base sm:text-lg">分析メニュー</h2>
+        </div>
         <div id="analyzerGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4"></div>
     </section>
 
-    <!-- パラメータ -->
-    <div id="paramsSection" class="mb-6 sm:mb-8 hidden">
-        <div class="bg-gs-card border border-gs-border rounded-xl p-4 sm:p-6">
-            <h3 class="text-white font-semibold mb-3 sm:mb-4 text-sm sm:text-base" id="paramsTitle">パラメータ</h3>
+    <!-- Parameters -->
+    <div id="paramsSection" class="mb-6 sm:mb-10 hidden">
+        <div class="card-elevated rounded-2xl p-4 sm:p-7">
+            <div class="flex items-center gap-2 mb-4 sm:mb-5">
+                <div class="w-1 h-5 bg-gs-gold rounded-full"></div>
+                <h3 class="text-white font-semibold text-sm sm:text-base" id="paramsTitle">パラメータ</h3>
+            </div>
             <div id="paramsContent" class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4"></div>
-            <div class="mt-4">
-                <button onclick="submitWithParams()" class="w-full sm:w-auto bg-gs-gold hover:bg-gs-gold/80 active:bg-gs-gold/60 text-gs-dark px-6 py-2.5 rounded-lg font-medium transition-colors text-base">
+            <div class="mt-5">
+                <button onclick="submitWithParams()" class="btn-gold w-full sm:w-auto text-gs-darker px-7 py-2.5 sm:py-3 rounded-xl font-semibold text-base">
                     分析開始
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- ローディング -->
-    <div id="loading" class="hidden text-center py-12 sm:py-16">
-        <div class="loader mx-auto mb-4"></div>
-        <p class="text-gs-text/70 text-sm" id="loadingText">分析中...</p>
+    <!-- Loading -->
+    <div id="loading" class="hidden text-center py-16 sm:py-24">
+        <div class="loader mx-auto mb-5"></div>
+        <p class="text-gs-text-muted text-sm loader-pulse" id="loadingText">分析中...</p>
     </div>
 
-    <!-- 結果 -->
+    <!-- Results -->
     <div id="results" class="hidden fade-in"></div>
 </main>
 
-<!-- フッター -->
-<footer class="border-t border-gs-border mt-12 sm:mt-16 py-4 sm:py-6">
-    <div class="max-w-7xl mx-auto px-3 sm:px-4 text-center text-gs-text/40 text-[10px] sm:text-xs">
-        <p>GSSS - Goldman Sachs Style Stock Screener</p>
-        <p class="mt-1">投資は自己責任で行ってください。本ツールの分析結果は投資助言ではありません。</p>
-        <p class="mt-1">データ: Yahoo Finance | CORSプロキシ経由（一部データは取得制限あり）</p>
-        <p id="initStatus" class="mt-1 text-gs-text/30"></p>
+<!-- Footer -->
+<footer class="border-t border-gs-border/40 mt-16 sm:mt-24 py-6 sm:py-8 relative z-10">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 text-center">
+        <div class="flex items-center justify-center gap-2 mb-3">
+            <div class="logo-badge w-5 h-5 rounded flex items-center justify-center text-gs-darker font-bold text-[8px]">GS</div>
+            <span class="text-gs-text-muted/60 text-xs font-medium tracking-wide">GSSS</span>
+        </div>
+        <p class="text-gs-text-muted/40 text-[10px] sm:text-xs leading-relaxed">投資は自己責任で行ってください。本ツールの分析結果は投資助言ではありません。</p>
+        <p class="text-gs-text-muted/30 text-[10px] sm:text-xs mt-1">データ: Yahoo Finance | CORSプロキシ経由</p>
+        <p id="initStatus" class="mt-2 text-gs-text-muted/25 text-[10px]"></p>
     </div>
 </footer>
 
