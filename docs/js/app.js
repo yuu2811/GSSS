@@ -1,31 +1,34 @@
 /**
- * GSSS - GitHub Pages版 メインアプリケーション
+ * GSSS - GitHub Pages 版 メインアプリケーション
  */
 
+// ── 分析エンジン定義 ────────────────────────────────
 const ANALYZERS = {
-    goldman: { name: 'Goldman Sachs 株式スクリーナー', short: 'GS スクリーナー', icon: '📊', description: 'P/E比率、収益成長、負債比率、配当利回り、競争優位性の総合分析', needs_ticker: true },
+    goldman:          { name: 'Goldman Sachs 株式スクリーナー', short: 'GS スクリーナー', icon: '📊', description: 'P/E比率、収益成長、負債比率、配当利回り、競争優位性の総合分析', needs_ticker: true },
     morgan_technical: { name: 'Morgan Stanley テクニカル分析', short: 'MS テクニカル', icon: '📈', description: 'トレンド、移動平均、RSI、MACD、ボリンジャーバンド等の主要テクニカル指標', needs_ticker: true },
-    bridgewater: { name: 'Bridgewater リスク評価', short: 'BW リスク', icon: '🛡️', description: 'ボラティリティ、ベータ、最大ドローダウン、ストレステスト、ヘッジ提案', needs_ticker: true },
-    jpmorgan: { name: 'JPMorgan 決算アナライザー', short: 'JPM 決算', icon: '📋', description: '決算履歴、コンセンサス予想、決算日の値動き予想、ポジション戦略', needs_ticker: true },
-    blackrock: { name: 'BlackRock 配当インカム分析', short: 'BLK 配当', icon: '💰', description: '配当利回り、増配履歴、配当安全性、DRIP複利シミュレーション', needs_ticker: true },
-    citadel: { name: 'Citadel セクターローテーション', short: 'CTD セクター', icon: '🔄', description: '経済サイクル、セクターパフォーマンス比較、ローテーション推奨', needs_ticker: false },
-    renaissance: { name: 'Renaissance 定量スクリーナー', short: 'REN 定量', icon: '🔬', description: 'バリュー、クオリティ、モメンタム、成長、センチメントの複合スコア', needs_ticker: true },
-    vanguard: { name: 'Vanguard ETFポートフォリオ', short: 'VGD ETF', icon: '🏗️', description: 'アセットアロケーション、ETF選定、リバランスルール、税務最適化', needs_ticker: false },
-    mckinsey: { name: 'McKinsey マクロ経済レポート', short: 'MCK マクロ', icon: '🌍', description: '金利、インフレ、GDP、為替が市場に与える影響を分析', needs_ticker: false },
-    morgan_dcf: { name: 'Morgan Stanley DCFバリュエーション', short: 'MS DCF', icon: '🧮', description: '5年間の収益予測、WACC、ターミナルバリュー、感度分析による理論株価算出', needs_ticker: true },
+    bridgewater:      { name: 'Bridgewater リスク評価', short: 'BW リスク', icon: '🛡️', description: 'ボラティリティ、ベータ、最大ドローダウン、ストレステスト、ヘッジ提案', needs_ticker: true },
+    jpmorgan:         { name: 'JPMorgan 決算アナライザー', short: 'JPM 決算', icon: '📋', description: '決算履歴、コンセンサス予想、決算日の値動き予想、ポジション戦略', needs_ticker: true },
+    blackrock:        { name: 'BlackRock 配当インカム分析', short: 'BLK 配当', icon: '💰', description: '配当利回り、増配履歴、配当安全性、DRIP複利シミュレーション', needs_ticker: true },
+    citadel:          { name: 'Citadel セクターローテーション', short: 'CTD セクター', icon: '🔄', description: '経済サイクル、セクターパフォーマンス比較、ローテーション推奨', needs_ticker: false },
+    renaissance:      { name: 'Renaissance 定量スクリーナー', short: 'REN 定量', icon: '🔬', description: 'バリュー、クオリティ、モメンタム、成長、センチメントの複合スコア', needs_ticker: true },
+    vanguard:         { name: 'Vanguard ETFポートフォリオ', short: 'VGD ETF', icon: '🏗️', description: 'アセットアロケーション、ETF選定、リバランスルール、税務最適化', needs_ticker: false },
+    mckinsey:         { name: 'McKinsey マクロ経済レポート', short: 'MCK マクロ', icon: '🌍', description: '金利、インフレ、GDP、為替が市場に与える影響を分析', needs_ticker: false },
+    morgan_dcf:       { name: 'Morgan Stanley DCFバリュエーション', short: 'MS DCF', icon: '🧮', description: '5年間の収益予測、WACC、ターミナルバリュー、感度分析による理論株価算出', needs_ticker: true },
 };
 
+// ── アプリ状態 ───────────────────────────────────────
 let currentTicker = '';
 let currentAnalyzer = '';
 let cachedStockData = null;
+let statusTimer = null;
 
+// ── 初期化 ──────────────────────────────────────────
 function init() {
     const grid = document.getElementById('analyzerGrid');
     for (const [key, a] of Object.entries(ANALYZERS)) {
         const div = document.createElement('div');
         div.className = 'analyzer-card bg-gs-card border border-gs-border rounded-xl p-4 sm:p-5 cursor-pointer active:scale-[0.98]';
         div.setAttribute('data-analyzer', key);
-        div.setAttribute('data-needs-ticker', a.needs_ticker);
         div.onclick = () => runAnalysis(key);
         div.innerHTML = `
             <div class="flex items-start gap-3">
@@ -35,8 +38,7 @@ function init() {
                     <p class="text-gs-text/60 text-xs leading-relaxed">${a.description}</p>
                 </div>
             </div>
-            ${!a.needs_ticker ? '<div class="mt-3"><span class="text-xs bg-gs-navy/50 text-gs-accent px-2 py-0.5 rounded">銘柄コード不要</span></div>' : ''}
-        `;
+            ${!a.needs_ticker ? '<div class="mt-3"><span class="text-xs bg-gs-navy/50 text-gs-accent px-2 py-0.5 rounded">銘柄コード不要</span></div>' : ''}`;
         grid.appendChild(div);
     }
 
@@ -45,6 +47,7 @@ function init() {
     });
 }
 
+// ── 銘柄検索 ────────────────────────────────────────
 async function searchStock() {
     const input = document.getElementById('tickerInput').value.trim();
     if (!input) return;
@@ -70,8 +73,7 @@ async function searchStock() {
         } else {
             showStatus('データ取得完了', 'success');
         }
-    } catch (e) {
-        // 検索APIでの名前取得を試みる
+    } catch {
         currentTicker = ticker;
         cachedStockData = null;
         try {
@@ -93,6 +95,7 @@ async function searchStock() {
     }
 }
 
+// ── 分析実行 ────────────────────────────────────────
 async function runAnalysis(analyzerType) {
     const info = ANALYZERS[analyzerType];
     if (!info) return;
@@ -104,9 +107,7 @@ async function runAnalysis(analyzerType) {
             document.getElementById('tickerInput').focus();
             return;
         }
-        if (!currentTicker) {
-            currentTicker = StockFetcher.normalizeTicker(input);
-        }
+        if (!currentTicker) currentTicker = StockFetcher.normalizeTicker(input);
     }
 
     if (analyzerType === 'blackrock' || analyzerType === 'vanguard') {
@@ -125,16 +126,17 @@ function showParamsForm(analyzerType) {
     const title = document.getElementById('paramsTitle');
     section.classList.remove('hidden');
 
+    const inputClass = 'w-full bg-gs-dark border border-gs-border rounded-lg px-4 py-3 text-white focus:border-gs-accent focus:outline-none text-base';
+
     if (analyzerType === 'blackrock') {
         title.textContent = 'BlackRock 配当分析 - パラメータ';
-        content.innerHTML = `<div><label class="block text-sm text-gs-text/70 mb-1">投資金額（円）</label><input type="number" id="param_investment_amount" value="1000000" class="w-full bg-gs-dark border border-gs-border rounded-lg px-4 py-3 text-white focus:border-gs-accent focus:outline-none text-base"></div>`;
+        content.innerHTML = `<div><label class="block text-sm text-gs-text/70 mb-1">投資金額（円）</label><input type="number" id="param_investment_amount" value="1000000" class="${inputClass}"></div>`;
     } else {
         title.textContent = 'Vanguard ETFポートフォリオ - パラメータ';
         content.innerHTML = `
-            <div><label class="block text-sm text-gs-text/70 mb-1">年齢</label><input type="number" id="param_age" value="35" class="w-full bg-gs-dark border border-gs-border rounded-lg px-4 py-3 text-white focus:border-gs-accent focus:outline-none text-base"></div>
-            <div><label class="block text-sm text-gs-text/70 mb-1">投資金額（円）</label><input type="number" id="param_investment_amount" value="1000000" class="w-full bg-gs-dark border border-gs-border rounded-lg px-4 py-3 text-white focus:border-gs-accent focus:outline-none text-base"></div>
-            <div><label class="block text-sm text-gs-text/70 mb-1">リスクプロファイル</label><select id="param_risk_profile" class="w-full bg-gs-dark border border-gs-border rounded-lg px-4 py-3 text-white focus:border-gs-accent focus:outline-none text-base"><option value="積極型">積極型</option><option value="やや積極型">やや積極型</option><option value="バランス型" selected>バランス型</option><option value="やや保守型">やや保守型</option><option value="保守型">保守型</option></select></div>
-        `;
+            <div><label class="block text-sm text-gs-text/70 mb-1">年齢</label><input type="number" id="param_age" value="35" class="${inputClass}"></div>
+            <div><label class="block text-sm text-gs-text/70 mb-1">投資金額（円）</label><input type="number" id="param_investment_amount" value="1000000" class="${inputClass}"></div>
+            <div><label class="block text-sm text-gs-text/70 mb-1">リスクプロファイル</label><select id="param_risk_profile" class="${inputClass}"><option value="積極型">積極型</option><option value="やや積極型">やや積極型</option><option value="バランス型" selected>バランス型</option><option value="やや保守型">やや保守型</option><option value="保守型">保守型</option></select></div>`;
     }
     section.scrollIntoView({ behavior: 'smooth' });
 }
@@ -142,10 +144,10 @@ function showParamsForm(analyzerType) {
 async function submitWithParams() {
     const params = {};
     if (currentAnalyzer === 'blackrock') {
-        params.investment_amount = Number(document.getElementById('param_investment_amount').value);
+        params.investment_amount = Number(document.getElementById('param_investment_amount').value) || 1000000;
     } else if (currentAnalyzer === 'vanguard') {
-        params.age = Number(document.getElementById('param_age').value);
-        params.investment_amount = Number(document.getElementById('param_investment_amount').value);
+        params.age = Number(document.getElementById('param_age').value) || 35;
+        params.investment_amount = Number(document.getElementById('param_investment_amount').value) || 1000000;
         params.risk_profile = document.getElementById('param_risk_profile').value;
     }
     document.getElementById('paramsSection').classList.add('hidden');
@@ -165,8 +167,6 @@ async function executeAnalysis(analyzerType, params) {
     loading.scrollIntoView({ behavior: 'smooth' });
 
     try {
-        let data;
-
         if (info.needs_ticker) {
             loadingText.textContent = `${currentTicker} のデータを取得中...`;
             if (!cachedStockData || cachedStockData.ticker !== currentTicker) {
@@ -175,26 +175,26 @@ async function executeAnalysis(analyzerType, params) {
             loadingText.textContent = '分析を実行中...';
         }
 
-        switch (analyzerType) {
-            case 'goldman': data = Analyzers.goldman(cachedStockData); break;
-            case 'morgan_technical': data = Analyzers.morgan_technical(cachedStockData); break;
-            case 'bridgewater': data = await Analyzers.bridgewater(cachedStockData); break;
-            case 'jpmorgan': data = Analyzers.jpmorgan(cachedStockData); break;
-            case 'blackrock': data = Analyzers.blackrock(cachedStockData, params.investment_amount); break;
-            case 'citadel': loadingText.textContent = '市場データを取得中...'; data = await Analyzers.citadel(); break;
-            case 'renaissance': data = Analyzers.renaissance(cachedStockData); break;
-            case 'vanguard': data = Analyzers.vanguard(params); break;
-            case 'mckinsey': loadingText.textContent = 'マクロデータを取得中...'; data = await Analyzers.mckinsey(); break;
-            case 'morgan_dcf': data = Analyzers.morgan_dcf(cachedStockData); break;
-        }
+        const analyzers = {
+            goldman: () => Analyzers.goldman(cachedStockData),
+            morgan_technical: () => Analyzers.morgan_technical(cachedStockData),
+            bridgewater: () => Analyzers.bridgewater(cachedStockData),
+            jpmorgan: () => Analyzers.jpmorgan(cachedStockData),
+            blackrock: () => Analyzers.blackrock(cachedStockData, params.investment_amount),
+            citadel: () => { loadingText.textContent = '市場データを取得中...'; return Analyzers.citadel(); },
+            renaissance: () => Analyzers.renaissance(cachedStockData),
+            vanguard: () => Analyzers.vanguard(params),
+            mckinsey: () => { loadingText.textContent = 'マクロデータを取得中...'; return Analyzers.mckinsey(); },
+            morgan_dcf: () => Analyzers.morgan_dcf(cachedStockData),
+        };
+        const data = await analyzers[analyzerType]();
 
         loading.classList.add('hidden');
 
-        // データソース制限の注意メッセージ
         let dataNotice = '';
         if (cachedStockData && cachedStockData._dataSource === 'chart_only') {
             dataNotice = `<div class="bg-yellow-900/30 border border-yellow-700/50 rounded-xl p-4 mb-4 text-center">
-                <p class="text-yellow-400 text-sm font-medium">⚠ ファンダメンタルデータの一部が取得できませんでした</p>
+                <p class="text-yellow-400 text-sm font-medium">ファンダメンタルデータの一部が取得できませんでした</p>
                 <p class="text-yellow-300/60 text-xs mt-1">価格チャートデータに基づく分析結果です。P/E、配当利回り等の指標はN/Aと表示される場合があります。</p>
             </div>`;
         }
@@ -213,46 +213,32 @@ async function executeAnalysis(analyzerType, params) {
     }
 }
 
+// ── UI ヘルパー ──────────────────────────────────────
 function renderError(msg) {
     return `<div class="bg-red-900/30 border border-red-700/50 rounded-xl p-6 text-center">
         <p class="text-red-400 font-medium text-lg">エラー</p>
-        <p class="text-red-300/80 mt-2 text-sm">${escapeHtml(msg)}</p>
+        <p class="text-red-300/80 mt-2 text-sm">${esc(msg)}</p>
         <p class="text-red-300/50 mt-3 text-xs">CORSプロキシの制限やYahoo Finance APIの仕様変更により<br>データを取得できない場合があります。</p>
         <button onclick="location.reload()" class="mt-4 bg-red-800/50 hover:bg-red-800/80 text-red-300 px-4 py-2 rounded-lg text-sm transition-colors">ページを再読み込み</button>
     </div>`;
 }
 
 function showStatus(message, type = 'info') {
-    let statusEl = document.getElementById('statusBar');
-    if (!statusEl) {
-        statusEl = document.createElement('div');
-        statusEl.id = 'statusBar';
-        statusEl.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 z-50 max-w-[90vw] text-center';
-        document.body.appendChild(statusEl);
+    let el = document.getElementById('statusBar');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'statusBar';
+        document.body.appendChild(el);
     }
 
-    const colors = {
-        info: 'bg-gs-accent/90 text-white',
-        success: 'bg-green-600/90 text-white',
-        warning: 'bg-yellow-600/90 text-white',
-        error: 'bg-red-600/90 text-white',
-    };
+    const colors = { info: 'bg-gs-accent/90', success: 'bg-green-600/90', warning: 'bg-yellow-600/90', error: 'bg-red-600/90' };
+    el.className = `fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all duration-300 z-50 max-w-[90vw] text-center ${colors[type] || colors.info}`;
+    el.textContent = message;
+    el.style.opacity = '1';
 
-    statusEl.className = `fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 z-50 max-w-[90vw] text-center ${colors[type] || colors.info}`;
-    statusEl.textContent = message;
-    statusEl.style.opacity = '1';
-
-    clearTimeout(statusEl._timer);
-    statusEl._timer = setTimeout(() => {
-        statusEl.style.opacity = '0';
-    }, type === 'error' ? 5000 : 3000);
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(() => { el.style.opacity = '0'; }, type === 'error' ? 5000 : 3000);
 }
 
-function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
-function formatNumber(n, d = 0) { if (n == null) return 'N/A'; if (typeof n !== 'number') return String(n); return n.toLocaleString('ja-JP', { minimumFractionDigits: d, maximumFractionDigits: d }); }
-function formatCurrency(n) { if (n == null) return 'N/A'; if (typeof n !== 'number') return String(n); if (Math.abs(n) >= 1e12) return `¥${(n/1e12).toFixed(1)}兆`; if (Math.abs(n) >= 1e8) return `¥${(n/1e8).toFixed(0)}億`; if (Math.abs(n) >= 1e4) return `¥${(n/1e4).toFixed(0)}万`; return `¥${n.toLocaleString('ja-JP')}`; }
-function formatPercent(n) { if (n == null) return 'N/A'; return `${n >= 0 ? '+' : ''}${n.toFixed(1)}%`; }
-function scoreColor(s, m = 10) { const r = s / m; return r >= 0.7 ? 'bg-green-500' : r >= 0.5 ? 'bg-yellow-500' : r >= 0.3 ? 'bg-orange-500' : 'bg-red-500'; }
-function riskColor(s) { return s <= 3 ? 'text-green-400' : s <= 5 ? 'text-yellow-400' : s <= 7 ? 'text-orange-400' : 'text-red-400'; }
-
+// ── 起動 ────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', init);
