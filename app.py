@@ -154,12 +154,25 @@ def analyze():
 
 @app.route("/api/search", methods=["GET"])
 def search_stock():
-    """銘柄コード検索（補助）"""
+    """銘柄コード・銘柄名で検索"""
     query = request.args.get("q", "").strip()
     if not query:
         return jsonify({"results": []})
 
     try:
+        # 数字のみの場合は従来通りコード検索
+        code = query.replace(".T", "")
+        if code.isdigit():
+            ticker = StockDataFetcher.normalize_ticker(query)
+            name = StockDataFetcher.get_company_name(ticker)
+            return jsonify({"results": [{"ticker": ticker, "name": name}]})
+
+        # 銘柄名で検索（ローカルDB + yfinance）
+        results = StockDataFetcher.search_by_name(query)
+        if results:
+            return jsonify({"results": results})
+
+        # それでも見つからない場合はそのまま試行
         ticker = StockDataFetcher.normalize_ticker(query)
         name = StockDataFetcher.get_company_name(ticker)
         return jsonify({"results": [{"ticker": ticker, "name": name}]})

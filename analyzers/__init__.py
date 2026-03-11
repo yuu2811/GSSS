@@ -1,4 +1,5 @@
 from .stock_data import StockDataFetcher
+from .stock_names import search_stocks, get_name_by_code
 from .goldman_screener import GoldmanScreener
 from .morgan_technical import MorganTechnical
 from .bridgewater_risk import BridgewaterRisk

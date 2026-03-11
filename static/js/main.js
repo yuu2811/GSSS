@@ -143,10 +143,101 @@ function showSkeletonLoader() {
     results.classList.remove('hidden');
 }
 
+// ══════════════════════════════════════════════════════
+// 検索サジェスト
+// ══════════════════════════════════════════════════════
+let suggestTimer = null;
+
+function showSuggestions(results) {
+    let container = document.getElementById('suggestionsContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'suggestionsContainer';
+        container.className = 'absolute left-0 right-0 top-full mt-1 bg-gs-card border border-gs-border rounded-xl shadow-2xl z-50 overflow-hidden max-h-64 overflow-y-auto';
+        const inputWrapper = document.getElementById('tickerInput').parentElement;
+        inputWrapper.style.position = 'relative';
+        inputWrapper.appendChild(container);
+    }
+
+    if (!results || results.length === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+
+    container.innerHTML = results.map((r, i) => {
+        const code = (r.code || r.ticker || '').replace('.T', '');
+        return `<div class="suggestion-item px-4 py-2.5 cursor-pointer hover:bg-gs-accent/10 transition-colors border-b border-gs-border/30 last:border-b-0 flex items-center gap-3"
+                     onclick="selectSuggestion('${escapeHtml(code)}', '${escapeHtml(r.name)}')">
+            <span class="text-gs-accent font-mono text-sm font-semibold min-w-[3.5rem]">${escapeHtml(code)}</span>
+            <span class="text-white text-sm truncate">${escapeHtml(r.name)}</span>
+        </div>`;
+    }).join('');
+    container.classList.remove('hidden');
+}
+
+function hideSuggestions() {
+    const container = document.getElementById('suggestionsContainer');
+    if (container) container.classList.add('hidden');
+}
+
+function selectSuggestion(code, name) {
+    document.getElementById('tickerInput').value = code;
+    hideSuggestions();
+    currentTicker = code.endsWith('.T') ? code : code + '.T';
+    document.getElementById('stockName').textContent = name;
+    document.getElementById('stockTicker').textContent = `(${currentTicker})`;
+    document.getElementById('stockInfo').classList.remove('hidden');
+    addToHistory(currentTicker, name);
+    showStatus('データ取得完了', 'success');
+}
+
+async function onSearchInput(value) {
+    clearTimeout(suggestTimer);
+    if (!value || value.length < 1) {
+        hideSuggestions();
+        return;
+    }
+    // 数字のみの入力で4桁未満の場合はまだサジェストしない
+    if (/^\d+$/.test(value) && value.length < 4) {
+        hideSuggestions();
+        return;
+    }
+    suggestTimer = setTimeout(async () => {
+        try {
+            const res = await fetch(`/api/search?q=${encodeURIComponent(value)}`);
+            const data = await res.json();
+            if (data.results && data.results.length > 1) {
+                showSuggestions(data.results);
+            } else if (data.results && data.results.length === 1 && !/^\d+$/.test(value)) {
+                // 名前検索で1件のみの場合もサジェスト表示
+                showSuggestions(data.results);
+            } else {
+                hideSuggestions();
+            }
+        } catch (e) {
+            hideSuggestions();
+        }
+    }, 300);
+}
+
 // ── 初期化 ──────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('tickerInput').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') searchStock();
+    const tickerInput = document.getElementById('tickerInput');
+    tickerInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            hideSuggestions();
+            searchStock();
+        }
+        if (e.key === 'Escape') hideSuggestions();
+    });
+    tickerInput.addEventListener('input', (e) => {
+        onSearchInput(e.target.value.trim());
+    });
+    // クリック外でサジェストを閉じる
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#tickerInput') && !e.target.closest('#suggestionsContainer')) {
+            hideSuggestions();
+        }
     });
     renderSearchHistory();
     setupKeyboardShortcuts();
@@ -168,6 +259,8 @@ async function searchStock() {
             document.getElementById('stockInfo').classList.remove('hidden');
             addToHistory(stock.ticker, stock.name);
             showStatus('データ取得完了', 'success');
+        } else {
+            showStatus('銘柄が見つかりませんでした', 'warning');
         }
     } catch (e) {
         console.error('検索エラー:', e);
