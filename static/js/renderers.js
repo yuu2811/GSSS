@@ -166,6 +166,7 @@ function renderAnalysis(type, data, info) {
         blackrock: renderBlackRock, citadel: renderCitadel,
         renaissance: renderRenaissance, vanguard: renderVanguard,
         mckinsey: renderMcKinsey, morgan_dcf: renderMorganDCF,
+        academic_quant: renderAcademicQuant, chart_pattern: renderChartPattern,
     };
     const render = renderers[type];
     const content = render ? render(data) : `<pre class="text-xs overflow-auto p-4 bg-gs-darker rounded-xl">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
@@ -546,6 +547,353 @@ function renderMorganDCF(d) {
     if (sens.table?.length > 0) {
         html += card('感度分析ヒートマップ', heatmapTable(sens, d.current_price));
     }
+    html += '</div>';
+    return html;
+}
+
+// ══════════════════════════════════════════════════════
+// SVG レーダーチャート
+// ══════════════════════════════════════════════════════
+function radarChart(factors, options = {}) {
+    const { size = 240, color = '#4A9EFF' } = options;
+    const cx = size / 2, cy = size / 2, r = size / 2 - 30;
+    const keys = Object.keys(factors);
+    const n = keys.length;
+    if (n < 3) return '';
+    const step = (2 * Math.PI) / n;
+
+    // Grid
+    let grid = '';
+    [0.2, 0.4, 0.6, 0.8, 1.0].forEach(frac => {
+        const pts = keys.map((_, i) => {
+            const a = -Math.PI / 2 + i * step;
+            return `${(cx + r * frac * Math.cos(a)).toFixed(1)},${(cy + r * frac * Math.sin(a)).toFixed(1)}`;
+        }).join(' ');
+        grid += `<polygon points="${pts}" fill="none" stroke="#2a2f3a" stroke-width="0.5"/>`;
+    });
+
+    // Axes + labels
+    let axes = '';
+    keys.forEach((k, i) => {
+        const a = -Math.PI / 2 + i * step;
+        const x2 = cx + r * Math.cos(a), y2 = cy + r * Math.sin(a);
+        axes += `<line x1="${cx}" y1="${cy}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#2a2f3a" stroke-width="0.5"/>`;
+        const lx = cx + (r + 18) * Math.cos(a), ly = cy + (r + 18) * Math.sin(a);
+        const anchor = Math.abs(Math.cos(a)) < 0.1 ? 'middle' : Math.cos(a) > 0 ? 'start' : 'end';
+        axes += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${anchor}" dominant-baseline="central" fill="#8896AB" font-size="9">${escapeHtml(k)}</text>`;
+    });
+
+    // Data polygon
+    const pts = keys.map((k, i) => {
+        const v = Math.min(Math.max(factors[k] || 0, 0), 100) / 100;
+        const a = -Math.PI / 2 + i * step;
+        return `${(cx + r * v * Math.cos(a)).toFixed(1)},${(cy + r * v * Math.sin(a)).toFixed(1)}`;
+    }).join(' ');
+
+    // Data dots
+    let dots = '';
+    keys.forEach((k, i) => {
+        const v = Math.min(Math.max(factors[k] || 0, 0), 100) / 100;
+        const a = -Math.PI / 2 + i * step;
+        const dx = cx + r * v * Math.cos(a), dy = cy + r * v * Math.sin(a);
+        dots += `<circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="3" fill="${color}"/>`;
+    });
+
+    return `<div class="flex justify-center"><svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">
+        ${grid}${axes}
+        <polygon points="${pts}" fill="${color}" fill-opacity="0.15" stroke="${color}" stroke-width="1.5"/>
+        ${dots}
+    </svg></div>`;
+}
+
+// ══════════════════════════════════════════════════════
+// SVG ローソク足チャート
+// ══════════════════════════════════════════════════════
+function candlestickChart(chartData, options = {}) {
+    if (!chartData?.ohlcv?.length) return '';
+    const { width = 720, height = 320 } = options;
+    const ohlcv = chartData.ohlcv;
+    const n = ohlcv.length;
+    const margin = { top: 10, right: 50, bottom: 40, left: 10 };
+    const cw = width - margin.left - margin.right;
+    const mainH = (height - margin.top - margin.bottom) * 0.75;
+    const volH = (height - margin.top - margin.bottom) * 0.2;
+    const gap = (height - margin.top - margin.bottom) * 0.05;
+
+    const allH = ohlcv.map(d => d.high);
+    const allL = ohlcv.map(d => d.low);
+    const pMin = Math.min(...allL), pMax = Math.max(...allH);
+    const pRange = pMax - pMin || 1;
+    const maxVol = Math.max(...ohlcv.map(d => d.volume || 0)) || 1;
+
+    const barW = Math.max(cw / n * 0.7, 1);
+    const xStep = cw / n;
+
+    function priceY(p) { return margin.top + mainH - ((p - pMin) / pRange) * mainH; }
+    function volY(v) { return margin.top + mainH + gap + volH - (v / maxVol) * volH; }
+
+    let candles = '';
+    ohlcv.forEach((d, i) => {
+        const x = margin.left + i * xStep + xStep / 2;
+        const isUp = d.close >= d.open;
+        const color = isUp ? '#4ade80' : '#f87171';
+        const bodyTop = priceY(Math.max(d.open, d.close));
+        const bodyBot = priceY(Math.min(d.open, d.close));
+        const bodyH = Math.max(bodyBot - bodyTop, 0.5);
+        // Wick
+        candles += `<line x1="${x}" y1="${priceY(d.high).toFixed(1)}" x2="${x}" y2="${priceY(d.low).toFixed(1)}" stroke="${color}" stroke-width="1"/>`;
+        // Body
+        candles += `<rect x="${(x - barW / 2).toFixed(1)}" y="${bodyTop.toFixed(1)}" width="${barW.toFixed(1)}" height="${bodyH.toFixed(1)}" fill="${isUp ? 'none' : color}" stroke="${color}" stroke-width="1" rx="0.5"/>`;
+        // Volume
+        const vh = (d.volume || 0) / maxVol * volH;
+        candles += `<rect x="${(x - barW / 2).toFixed(1)}" y="${(margin.top + mainH + gap + volH - vh).toFixed(1)}" width="${barW.toFixed(1)}" height="${vh.toFixed(1)}" fill="${color}" opacity="0.3"/>`;
+    });
+
+    // Trendlines
+    let lines = '';
+    (chartData.trendlines || []).forEach(tl => {
+        const x1 = margin.left + (tl.x1 / n) * cw;
+        const x2 = margin.left + (tl.x2 / n) * cw;
+        const dash = tl.type === 'resistance' ? '4,2' : '2,2';
+        const col = tl.type === 'resistance' ? '#f87171' : '#4ade80';
+        lines += `<line x1="${x1.toFixed(1)}" y1="${priceY(tl.y1).toFixed(1)}" x2="${x2.toFixed(1)}" y2="${priceY(tl.y2).toFixed(1)}" stroke="${col}" stroke-width="1" stroke-dasharray="${dash}" opacity="0.7"/>`;
+    });
+
+    // S/R horizontal lines
+    (chartData.support_resistance_lines || []).forEach(sr => {
+        const y = priceY(sr.price);
+        const col = sr.type === 'resistance' ? '#f87171' : '#4ade80';
+        lines += `<line x1="${margin.left}" y1="${y.toFixed(1)}" x2="${width - margin.right}" y2="${y.toFixed(1)}" stroke="${col}" stroke-width="0.8" stroke-dasharray="3,3" opacity="0.5"/>`;
+        lines += `<text x="${width - margin.right + 4}" y="${(y + 3).toFixed(1)}" fill="${col}" font-size="9">¥${formatNumber(sr.price)}</text>`;
+    });
+
+    // Pattern annotations
+    let annotations = '';
+    (chartData.annotations || []).forEach(ann => {
+        const x1 = margin.left + (ann.start_idx / n) * cw;
+        const x2 = margin.left + ((ann.end_idx || ann.start_idx) / n) * cw;
+        const aw = Math.max(x2 - x1, 4);
+        annotations += `<rect x="${x1.toFixed(1)}" y="${margin.top}" width="${aw.toFixed(1)}" height="${mainH}" fill="#4A9EFF" opacity="0.07" rx="2"/>`;
+        annotations += `<text x="${((x1 + x2) / 2).toFixed(1)}" y="${(margin.top + 12).toFixed(1)}" text-anchor="middle" fill="#4A9EFF" font-size="8">${escapeHtml(ann.label || '')}</text>`;
+    });
+
+    // Price axis (right)
+    let axis = '';
+    for (let i = 0; i <= 4; i++) {
+        const p = pMin + (pRange * i) / 4;
+        const y = priceY(p);
+        axis += `<text x="${width - margin.right + 4}" y="${(y + 3).toFixed(1)}" fill="#8896AB" font-size="9">¥${formatNumber(p)}</text>`;
+        axis += `<line x1="${margin.left}" y1="${y.toFixed(1)}" x2="${width - margin.right}" y2="${y.toFixed(1)}" stroke="#2a2f3a" stroke-width="0.5"/>`;
+    }
+
+    // Date labels (bottom)
+    const dateInterval = Math.max(Math.floor(n / 5), 1);
+    for (let i = 0; i < n; i += dateInterval) {
+        const x = margin.left + i * xStep + xStep / 2;
+        const label = ohlcv[i].date ? ohlcv[i].date.substring(5) : '';
+        axis += `<text x="${x.toFixed(1)}" y="${(height - 4).toFixed(1)}" text-anchor="middle" fill="#8896AB" font-size="8">${escapeHtml(label)}</text>`;
+    }
+
+    return `<div class="overflow-x-auto -mx-1">
+        <svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" preserveAspectRatio="xMidYMid meet" class="overflow-visible">
+            ${axis}${annotations}${candles}${lines}
+        </svg>
+    </div>`;
+}
+
+// === Academic Quant ===
+function renderAcademicQuant(d) {
+    let html = '';
+    const cs = d.composite_academic_score || {};
+    const csColor = (cs.total_score || 0) >= 60 ? 'text-green-400' : (cs.total_score || 0) >= 40 ? 'text-yellow-400' : 'text-red-400';
+
+    // Banner with composite score
+    html += bannerCard(`<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">
+            <h3 class="text-gs-accent font-bold text-sm tracking-wide">学術ファクター総合スコア</h3>
+            <div class="flex items-baseline gap-1"><span class="text-5xl font-bold text-white tracking-tight">${cs.total_score ?? 'N/A'}</span><span class="text-gs-text-muted text-lg">/100</span></div>
+        </div>
+        <div class="text-center mb-5"><span class="text-lg font-semibold ${csColor}">${escapeHtml(cs.rating || '')} — ${escapeHtml(cs.recommendation || '')}</span></div>`);
+
+    // Radar chart
+    const factorScores = cs.factor_scores || {};
+    if (Object.keys(factorScores).length >= 3) {
+        html += `<div class="card-elevated rounded-2xl p-5 sm:p-6 mb-4 fade-in">
+            <h3 class="text-white font-semibold mb-4 text-sm flex items-center gap-2">
+                <span class="w-1 h-4 bg-gs-border-light rounded-full"></span>ファクターレーダーチャート
+            </h3>
+            ${radarChart(factorScores)}
+        </div>`;
+    }
+
+    // Factor cards
+    html += '<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">';
+
+    const factorSections = [
+        ['fama_french', 'Fama-French マルチファクター'],
+        ['momentum', 'モメンタム戦略 (Jegadeesh-Titman)'],
+        ['low_volatility', '低ボラティリティ異常 (Ang et al.)'],
+        ['quality_minus_junk', 'Quality Minus Junk (Asness)'],
+        ['deep_value', 'ディープバリュー (LSV)'],
+        ['mean_reversion', '平均回帰 (Poterba-Summers)'],
+        ['volatility_forecast', 'ボラティリティ予測 (GARCH)'],
+        ['pair_trading', 'ペアトレーディング (Gatev)'],
+        ['post_earnings_drift', 'ポスト決算ドリフト (Bernard-Thomas)'],
+        ['accrual_anomaly', 'アクルーアル異常 (Sloan)'],
+        ['risk_parity', 'リスクパリティ (Maillard)'],
+    ];
+
+    factorSections.forEach(([key, name]) => {
+        const f = d[key] || {};
+        let body = scoreBar(f.score || 0, 100, name);
+
+        // Show metrics if available
+        const metrics = f.metrics || f.factor_exposures || f.sub_scores || {};
+        Object.entries(metrics).forEach(([mk, mv]) => {
+            if (mv != null && typeof mv !== 'object') {
+                const val = typeof mv === 'number' ? (Number.isInteger(mv) ? String(mv) : mv.toFixed(3)) : String(mv);
+                body += metric(mk, val);
+            }
+        });
+
+        // Details list
+        body += `<div class="mt-2 space-y-1.5">${(f.details || []).map(detail =>
+            `<div class="text-xs text-gs-text-muted flex gap-1.5"><span class="text-gs-accent/60">&#x2022;</span>${escapeHtml(detail)}</div>`
+        ).join('')}</div>`;
+
+        html += card(`${name} (${f.score ?? 0}/100)`, body);
+    });
+
+    html += '</div>';
+
+    // Academic references
+    html += `<div class="mt-4 p-4 bg-gs-darker/60 rounded-xl">
+        <h4 class="text-xs text-gs-text-muted/60 font-semibold mb-2">参考文献</h4>
+        <div class="text-[10px] text-gs-text-muted/40 space-y-0.5 italic">
+            <div>Fama & French (1993, 2015) "Common risk factors in the returns on stocks and bonds"</div>
+            <div>Jegadeesh & Titman (1993) "Returns to buying winners and selling losers"</div>
+            <div>Ang, Hodrick, Xing & Zhang (2006) "The cross-section of volatility and expected returns"</div>
+            <div>Asness, Frazzini & Pedersen (2019) "Quality minus junk"</div>
+            <div>Lakonishok, Shleifer & Vishny (1994) "Contrarian investment, extrapolation, and risk"</div>
+            <div>Poterba & Summers (1988) "Mean reversion in stock prices"</div>
+            <div>Bollerslev (1986) "Generalized autoregressive conditional heteroskedasticity"</div>
+            <div>Gatev, Goetzmann & Rouwenhorst (2006) "Pairs trading"</div>
+            <div>Bernard & Thomas (1989) "Post-earnings-announcement drift"</div>
+            <div>Sloan (1996) "Do stock prices fully reflect information in accruals and cash flows?"</div>
+            <div>Maillard, Roncalli & Teiletche (2010) "The properties of equally weighted risk contribution portfolios"</div>
+        </div>
+    </div>`;
+
+    return html;
+}
+
+// === Chart Pattern ===
+function renderChartPattern(d) {
+    let html = '';
+    const sig = d.signals_summary || {};
+
+    // Banner with primary signal
+    const sigDir = sig.direction || '中立';
+    const sigColor = sigDir.includes('強気') ? 'text-green-400' : sigDir.includes('弱気') ? 'text-red-400' : 'text-yellow-400';
+    html += bannerCard(`<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+            <div>
+                <h3 class="text-gs-accent font-bold text-sm tracking-wide mb-1">シグナルサマリー</h3>
+                <span class="text-2xl font-bold ${sigColor}">${escapeHtml(sigDir)}</span>
+                <span class="text-gs-text-muted ml-2">信頼度 ${sig.confidence || 0}%</span>
+            </div>
+            <div class="text-right">
+                <div class="text-xs text-gs-text-muted">強気 ${sig.bullish_count || 0} / 弱気 ${sig.bearish_count || 0}</div>
+            </div>
+        </div>
+        ${(sig.price_targets || []).length ? `<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">${sig.price_targets.map(t =>
+            `<div class="bg-gs-darker/60 rounded-xl p-3 text-center">
+                <div class="text-[10px] text-gs-text-muted mb-1">${escapeHtml(t.label || t.pattern || '')}</div>
+                <div class="${t.type === 'bullish' ? 'text-green-400' : 'text-red-400'} font-bold">¥${formatNumber(t.price)}</div>
+            </div>`
+        ).join('')}</div>` : ''}`);
+
+    // Candlestick chart
+    if (d.chart_data?.ohlcv?.length) {
+        html += `<div class="card-elevated rounded-2xl p-5 sm:p-6 mb-4 fade-in">
+            <h3 class="text-white font-semibold mb-4 text-sm flex items-center gap-2">
+                <span class="w-1 h-4 bg-gs-border-light rounded-full"></span>ローソク足チャート（120日）
+            </h3>
+            ${candlestickChart(d.chart_data)}
+        </div>`;
+    }
+
+    html += '<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">';
+
+    // Classical patterns
+    const cp = d.classical_patterns || [];
+    if (cp.length > 0) {
+        let cpBody = '';
+        cp.forEach(p => {
+            const pColor = p.signal === '強気' ? 'green' : p.signal === '弱気' ? 'red' : 'yellow';
+            cpBody += `<div class="py-2.5 border-b border-gs-border/30 last:border-0">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-sm text-white font-medium">${escapeHtml(p.name)}</span>
+                    <div class="flex gap-1.5">${badge(p.signal, pColor)} ${badge('信頼度 ' + (p.confidence || 0) + '%')}</div>
+                </div>
+                <div class="text-xs text-gs-text-muted">${escapeHtml(p.description || '')}</div>
+                ${p.target_price ? `<div class="text-xs mt-1 ${pColor === 'green' ? 'text-green-400' : 'text-red-400'}">目標価格: ¥${formatNumber(p.target_price)}</div>` : ''}
+            </div>`;
+        });
+        html += card('古典的チャートパターン', cpBody);
+    } else {
+        html += card('古典的チャートパターン', '<div class="text-xs text-gs-text-muted">現在検出されたパターンはありません</div>');
+    }
+
+    // Candlestick patterns
+    const cs = d.candlestick_patterns || [];
+    if (cs.length > 0) {
+        let csBody = '';
+        cs.forEach(p => {
+            const pColor = p.signal === '強気' ? 'green' : p.signal === '弱気' ? 'red' : 'yellow';
+            csBody += `<div class="py-2 border-b border-gs-border/30 last:border-0">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-white">${escapeHtml(p.name)}</span>
+                    ${badge(p.signal, pColor)}
+                </div>
+                <div class="text-xs text-gs-text-muted mt-0.5">${escapeHtml(p.description || '')}</div>
+            </div>`;
+        });
+        html += card('ローソク足パターン', csBody);
+    } else {
+        html += card('ローソク足パターン', '<div class="text-xs text-gs-text-muted">直近で検出されたパターンはありません</div>');
+    }
+
+    // Trend analysis
+    const tr = d.trend_analysis || {};
+    const adx = tr.adx_data || {};
+    html += card('トレンド分析', `${metric('ADX', adx.adx != null ? adx.adx.toFixed(1) : 'N/A')}
+        ${metric('+DI', adx.plus_di != null ? adx.plus_di.toFixed(1) : 'N/A')}
+        ${metric('-DI', adx.minus_di != null ? adx.minus_di.toFixed(1) : 'N/A')}
+        ${metric('トレンド強度', adx.trend_strength || 'N/A')}
+        ${metric('トレンド方向', tr.direction || 'N/A')}`);
+
+    // MA Crossover
+    const ma = d.ma_crossover_systems || {};
+    html += card('移動平均クロスオーバー', `${metric('ゴールデン/デッドクロス', ma.crossover_status || 'N/A')}
+        ${metric('最終クロスからの日数', ma.days_since_crossover != null ? ma.days_since_crossover + '日' : 'N/A')}
+        ${metric('MA整列', ma.alignment || 'N/A')}
+        ${metric('SMA50', ma.sma_50 != null ? '¥' + formatNumber(ma.sma_50) : 'N/A')}
+        ${metric('SMA200', ma.sma_200 != null ? '¥' + formatNumber(ma.sma_200) : 'N/A')}`);
+
+    // Support/Resistance
+    const sr = d.support_resistance || {};
+    if ((sr.levels || []).length > 0) {
+        let srBody = '';
+        (sr.levels || []).forEach(lv => {
+            const color = lv.type === 'resistance' ? 'text-red-400' : 'text-green-400';
+            srBody += metric(
+                `${lv.type === 'resistance' ? 'レジスタンス' : 'サポート'}`,
+                `<span class="${color}">¥${formatNumber(lv.price)}</span>`,
+                lv.distance_pct != null ? `${lv.distance_pct > 0 ? '+' : ''}${lv.distance_pct.toFixed(1)}%` : ''
+            );
+        });
+        html += card('サポート/レジスタンス', srBody);
+    }
+
     html += '</div>';
     return html;
 }

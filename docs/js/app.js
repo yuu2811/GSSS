@@ -16,6 +16,8 @@ const ANALYZERS = {
     vanguard:         { name: 'Vanguard ETFポートフォリオ', short: 'VGD ETF', icon: '🏗️', description: 'アセットアロケーション、ETF選定、リバランスルール、税務最適化', needs_ticker: false },
     mckinsey:         { name: 'McKinsey マクロ経済レポート', short: 'MCK マクロ', icon: '🌍', description: '金利、インフレ、GDP、為替が市場に与える影響を分析', needs_ticker: false },
     morgan_dcf:       { name: 'Morgan Stanley DCFバリュエーション', short: 'MS DCF', icon: '🧮', description: '5年間の収益予測、WACC、ターミナルバリュー、感度分析による理論株価算出', needs_ticker: true },
+    academic_quant:   { name: 'Academic Paper 定量分析', short: '学術定量分析', icon: '🎓', description: 'Fama-French、モメンタム、低ボラティリティ、QMJ等の学術論文ベースファクター分析', needs_ticker: true },
+    chart_pattern:    { name: 'チャートパターン分析', short: 'チャートパターン', icon: '📐', description: 'ヘッドアンドショルダー、ダブルトップ、三角保ち合い等のパターン認識とトレンド分析', needs_ticker: true },
 };
 
 // ── アプリ状態 ───────────────────────────────────────

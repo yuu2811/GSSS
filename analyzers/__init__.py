@@ -10,3 +10,5 @@ from .renaissance_quant import RenaissanceQuant
 from .vanguard_etf import VanguardETF
 from .mckinsey_macro import McKinseyMacro
 from .morgan_dcf import MorganDCF
+from .academic_quant import AcademicQuant
+from .chart_pattern import ChartPattern
