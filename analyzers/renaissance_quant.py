@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+from .stock_data import StockDataFetcher
 
 
 class RenaissanceQuant:
@@ -15,7 +16,7 @@ class RenaissanceQuant:
         info = stock_data.get("info", {})
         history = stock_data.get("history")
         ticker = stock_data.get("ticker", "N/A")
-        company_name = info.get("longName", info.get("shortName", ticker))
+        company_name = StockDataFetcher.get_display_name(info, ticker)
 
         # 各ファクタースコア計算
         value = RenaissanceQuant._value_factors(info)
@@ -125,9 +126,8 @@ class RenaissanceQuant:
                 score += 5
                 details.append(f"営業利益率 {margin_pct:.1f}%")
 
-        de = info.get("debtToEquity")
-        if de is not None:
-            de_ratio = de / 100 if de > 10 else de
+        de_ratio = info.get("debtToEquity")  # _enrich_infoで小数形式に正規化済み
+        if de_ratio is not None:
             if de_ratio < 0.5:
                 score += 25
                 details.append(f"D/E比率 {de_ratio:.2f} （低い）")

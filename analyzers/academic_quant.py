@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+from .stock_data import StockDataFetcher
 
 
 class AcademicQuant:
@@ -15,7 +16,7 @@ class AcademicQuant:
         info = stock_data.get("info", {})
         history = stock_data.get("history")
         ticker = stock_data.get("ticker", "N/A")
-        company_name = info.get("longName", info.get("shortName", ticker))
+        company_name = StockDataFetcher.get_display_name(info, ticker)
 
         ff = AcademicQuant._fama_french(info, history)
         mom = AcademicQuant._momentum(info, history)
@@ -252,9 +253,8 @@ class AcademicQuant:
             sub_scores["粗利益率"] = f"{gp_pct:.1f}%"
 
         # Safety (leverage)
-        de = info.get("debtToEquity")
-        if de is not None:
-            de_ratio = de / 100 if de > 10 else de
+        de_ratio = info.get("debtToEquity")  # _enrich_infoで小数形式に正規化済み
+        if de_ratio is not None:
             if de_ratio < 0.3:
                 score += 25
                 details.append(f"D/E {de_ratio:.2f} — 安全（低レバレッジ）")
@@ -285,9 +285,9 @@ class AcademicQuant:
             sub_scores["売上成長率"] = f"{rg:.1f}%"
 
         # Payout
-        payout = info.get("payoutRatio")
+        payout = info.get("payoutRatio")  # _enrich_infoで小数形式に正規化済み
         if payout is not None:
-            po_pct = payout * 100 if abs(payout) < 2 else payout
+            po_pct = payout * 100
             if 20 < po_pct < 60:
                 score += 20
                 details.append(f"配当性向 {po_pct:.0f}% — 適正")

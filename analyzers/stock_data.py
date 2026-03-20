@@ -11,6 +11,30 @@ from .stock_names import search_stocks, get_name_by_code
 class StockDataFetcher:
     """日本株のデータを取得・整形するクラス"""
 
+    # ── 共通ヘルパーメソッド ──────────────────────────────
+
+    @staticmethod
+    def get_display_name(info: dict, ticker: str = "N/A") -> str:
+        """info辞書から表示用会社名を取得"""
+        return info.get("longName") or info.get("shortName") or ticker
+
+    @staticmethod
+    def get_current_price(info: dict) -> float:
+        """info辞書から現在価格を取得"""
+        return info.get("currentPrice") or info.get("regularMarketPrice") or 0
+
+    @staticmethod
+    def normalize_percent(value, threshold: float = 10) -> float | None:
+        """比率を小数形式(0.x)に正規化する。
+        yfinanceのD/E比率、配当性向等は値域が不定（小数 or パーセント）のため統一する。
+        threshold以上の値はパーセント値とみなして100で割る。
+        """
+        if value is None:
+            return None
+        if abs(value) >= threshold:
+            return value / 100
+        return value
+
     # 主要な日本株セクターETF
     SECTOR_ETFS = {
         "情報・通信": "1626.T",
@@ -243,11 +267,13 @@ class StockDataFetcher:
         if not info.get("profitMargins") and net_income and total_revenue and total_revenue != 0:
             info["profitMargins"] = net_income / total_revenue
 
-        # --- D/E比率 ---
-        if not info.get("debtToEquity"):
+        # --- D/E比率（小数形式で統一、例: 0.5 = 50%）---
+        if info.get("debtToEquity") is not None:
+            info["debtToEquity"] = StockDataFetcher.normalize_percent(info["debtToEquity"])
+        else:
             total_debt_val = info.get("totalDebt") or total_debt_bs
             if total_debt_val and total_equity and total_equity != 0:
-                info["debtToEquity"] = (total_debt_val / total_equity) * 100
+                info["debtToEquity"] = total_debt_val / total_equity
 
         # --- PER (株価収益率) ---
         shares_outstanding = info.get("sharesOutstanding", 0)
@@ -332,6 +358,10 @@ class StockDataFetcher:
                 if market_cap:
                     ev = market_cap + total_debt_val - total_cash_val
                     info["enterpriseToEbitda"] = ev / ebitda
+
+        # --- 配当性向の正規化（小数形式で統一）---
+        if info.get("payoutRatio") is not None:
+            info["payoutRatio"] = StockDataFetcher.normalize_percent(info["payoutRatio"], threshold=2)
 
         # --- 配当性向の補完 ---
         if not info.get("payoutRatio") and dividends is not None and not dividends.empty and net_income and shares_outstanding:

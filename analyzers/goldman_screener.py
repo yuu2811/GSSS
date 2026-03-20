@@ -1,6 +1,7 @@
 """Goldman Sachs スタイル株式スクリーニング分析"""
 
 import numpy as np
+from .stock_data import StockDataFetcher
 
 
 class GoldmanScreener:
@@ -17,8 +18,8 @@ class GoldmanScreener:
         balance_sheet = stock_data.get("balance_sheet")
 
         ticker = stock_data.get("ticker", "N/A")
-        company_name = info.get("longName", info.get("shortName", ticker))
-        current_price = info.get("currentPrice") or info.get("regularMarketPrice", 0)
+        company_name = StockDataFetcher.get_display_name(info, ticker)
+        current_price = StockDataFetcher.get_current_price(info)
         sector = info.get("sector", "不明")
         industry = info.get("industry", "不明")
 
@@ -143,12 +144,9 @@ class GoldmanScreener:
 
     @staticmethod
     def _analyze_debt(info, balance_sheet):
-        de_ratio = info.get("debtToEquity")
+        de_ratio = info.get("debtToEquity")  # _enrich_infoで小数形式に正規化済み
         total_debt = info.get("totalDebt", 0)
         total_cash = info.get("totalCash", 0)
-
-        if de_ratio is not None:
-            de_ratio = de_ratio / 100 if de_ratio > 10 else de_ratio
 
         if de_ratio is None:
             health = "データなし"
@@ -190,7 +188,7 @@ class GoldmanScreener:
             div_yield_pct = 0
 
         if payout_ratio is not None:
-            payout_pct = payout_ratio * 100 if payout_ratio < 1 else payout_ratio
+            payout_pct = payout_ratio * 100  # _enrich_infoで小数形式に正規化済み
             if payout_pct < 40:
                 sustainability = "非常に持続可能"
                 score = 10
@@ -360,12 +358,9 @@ class GoldmanScreener:
 
     @staticmethod
     def _generate_summary(company_name, moat, risk, targets):
-        bull = targets.get("bull_target", "N/A")
-        bear = targets.get("bear_target", "N/A")
-        return (
-            f"{company_name}の総合評価: "
-            f"競争優位性は{moat['rating']}、"
-            f"リスクスコアは{risk['score']}/10。"
-            f"12ヶ月目標: 強気 ¥{bull:,.0f} / 弱気 ¥{bear:,.0f}" if isinstance(bull, (int, float)) else
-            f"{company_name}の総合評価: 競争優位性は{moat['rating']}、リスクスコアは{risk['score']}/10。"
-        )
+        bull = targets.get("bull_target")
+        bear = targets.get("bear_target")
+        base = f"{company_name}の総合評価: 競争優位性は{moat['rating']}、リスクスコアは{risk['score']}/10。"
+        if isinstance(bull, (int, float)) and isinstance(bear, (int, float)):
+            base += f"12ヶ月目標: 強気 ¥{bull:,.0f} / 弱気 ¥{bear:,.0f}"
+        return base

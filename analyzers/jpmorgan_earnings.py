@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+from .stock_data import StockDataFetcher
 
 
 class JPMorganEarnings:
@@ -17,9 +18,9 @@ class JPMorganEarnings:
         earnings_dates = stock_data.get("earnings_dates")
         financials = stock_data.get("financials")
         ticker = stock_data.get("ticker", "N/A")
-        company_name = info.get("longName", info.get("shortName", ticker))
+        company_name = StockDataFetcher.get_display_name(info, ticker)
 
-        current_price = info.get("currentPrice") or info.get("regularMarketPrice", 0)
+        current_price = StockDataFetcher.get_current_price(info)
 
         # 決算履歴分析
         earnings_history = JPMorganEarnings._earnings_history(earnings_dates)

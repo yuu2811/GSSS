@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+from .stock_data import StockDataFetcher
 
 
 class MorganDCF:
@@ -17,9 +18,9 @@ class MorganDCF:
         cashflow = stock_data.get("cashflow")
         balance_sheet = stock_data.get("balance_sheet")
         ticker = stock_data.get("ticker", "N/A")
-        company_name = info.get("longName", info.get("shortName", ticker))
+        company_name = StockDataFetcher.get_display_name(info, ticker)
 
-        current_price = info.get("currentPrice") or info.get("regularMarketPrice", 0)
+        current_price = StockDataFetcher.get_current_price(info)
         shares_outstanding = info.get("sharesOutstanding", 0)
         market_cap = info.get("marketCap", 0)
 
@@ -178,11 +179,8 @@ class MorganDCF:
         market_premium = 0.06  # 株式リスクプレミアム
         cost_of_equity = risk_free_rate + beta * market_premium
 
-        de_ratio = info.get("debtToEquity")
-        if de_ratio:
-            de = de_ratio / 100 if de_ratio > 10 else de_ratio
-        else:
-            de = 0.3
+        de_ratio = info.get("debtToEquity")  # _enrich_infoで小数形式に正規化済み
+        de = de_ratio if de_ratio else 0.3
 
         cost_of_debt = 0.015  # 日本企業の平均借入金利
         tax_rate = 0.30  # 実効税率

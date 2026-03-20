@@ -25,6 +25,36 @@ from analyzers import (
 
 app = Flask(__name__)
 
+
+# ── 分析エンジンのディスパッチテーブル ────────────────────
+# 各エンジンの呼び出し方法を一元管理。_run_analyzer と analyze_all の両方で使用。
+def _build_analyzer_fn(analyzer_type, stock_data, params):
+    """分析タイプに対応する呼び出し可能オブジェクトを返す"""
+    dispatch = {
+        "goldman": lambda: GoldmanScreener.analyze(stock_data),
+        "morgan_technical": lambda: MorganTechnical.analyze(stock_data),
+        "bridgewater": lambda: BridgewaterRisk.analyze(stock_data),
+        "jpmorgan": lambda: JPMorganEarnings.analyze(stock_data),
+        "blackrock": lambda: BlackRockDividend.analyze(
+            stock_data,
+            investment_amount=float(params.get("investment_amount", 1_000_000)),
+        ),
+        "citadel": lambda: CitadelSector.analyze(stock_data),
+        "renaissance": lambda: RenaissanceQuant.analyze(stock_data),
+        "vanguard": lambda: VanguardETF.analyze(
+            stock_data,
+            risk_profile=params.get("risk_profile", "バランス型"),
+            investment_amount=float(params.get("investment_amount", 1_000_000)),
+            age=int(params.get("age", 40)),
+        ),
+        "mckinsey": lambda: McKinseyMacro.analyze(stock_data),
+        "morgan_dcf": lambda: MorganDCF.analyze(stock_data),
+        "academic_quant": lambda: AcademicQuant.analyze(stock_data),
+        "chart_pattern": lambda: ChartPattern.analyze(stock_data),
+    }
+    return dispatch.get(analyzer_type)
+
+
 # 分析タイプの定義
 ANALYZERS = {
     "goldman": {
@@ -186,38 +216,10 @@ def analyze_all():
         results = {}
         errors = {}
 
-        # 銘柄必要な分析
-        ticker_analyzers = [
-            ("goldman", lambda sd: GoldmanScreener.analyze(sd)),
-            ("morgan_technical", lambda sd: MorganTechnical.analyze(sd)),
-            ("bridgewater", lambda sd: BridgewaterRisk.analyze(sd)),
-            ("jpmorgan", lambda sd: JPMorganEarnings.analyze(sd)),
-            ("blackrock", lambda sd: BlackRockDividend.analyze(sd, investment_amount=float(params.get("investment_amount", 1_000_000)))),
-            ("renaissance", lambda sd: RenaissanceQuant.analyze(sd)),
-            ("morgan_dcf", lambda sd: MorganDCF.analyze(sd)),
-            ("academic_quant", lambda sd: AcademicQuant.analyze(sd)),
-            ("chart_pattern", lambda sd: ChartPattern.analyze(sd)),
-        ]
-
-        for key, fn in ticker_analyzers:
-            try:
-                results[key] = _safe_serialize(fn(stock_data))
-            except Exception as e:
-                errors[key] = str(e)
-
-        # 銘柄不要な分析
-        market_analyzers = [
-            ("citadel", lambda: CitadelSector.analyze(stock_data)),
-            ("mckinsey", lambda: McKinseyMacro.analyze(stock_data)),
-            ("vanguard", lambda: VanguardETF.analyze(
-                stock_data,
-                risk_profile=params.get("risk_profile", "バランス型"),
-                investment_amount=float(params.get("investment_amount", 1_000_000)),
-                age=int(params.get("age", 40)),
-            )),
-        ]
-
-        for key, fn in market_analyzers:
+        for key in ANALYZERS:
+            fn = _build_analyzer_fn(key, stock_data, params)
+            if fn is None:
+                continue
             try:
                 results[key] = _safe_serialize(fn())
             except Exception as e:
@@ -265,38 +267,10 @@ def search_stock():
 
 def _run_analyzer(analyzer_type: str, stock_data: dict, params: dict) -> dict:
     """分析エンジンを実行"""
-    if analyzer_type == "goldman":
-        return GoldmanScreener.analyze(stock_data)
-    elif analyzer_type == "morgan_technical":
-        return MorganTechnical.analyze(stock_data)
-    elif analyzer_type == "bridgewater":
-        return BridgewaterRisk.analyze(stock_data)
-    elif analyzer_type == "jpmorgan":
-        return JPMorganEarnings.analyze(stock_data)
-    elif analyzer_type == "blackrock":
-        amount = params.get("investment_amount", 1_000_000)
-        return BlackRockDividend.analyze(stock_data, investment_amount=float(amount))
-    elif analyzer_type == "citadel":
-        return CitadelSector.analyze(stock_data)
-    elif analyzer_type == "renaissance":
-        return RenaissanceQuant.analyze(stock_data)
-    elif analyzer_type == "vanguard":
-        return VanguardETF.analyze(
-            stock_data,
-            risk_profile=params.get("risk_profile", "バランス型"),
-            investment_amount=float(params.get("investment_amount", 1_000_000)),
-            age=int(params.get("age", 40)),
-        )
-    elif analyzer_type == "mckinsey":
-        return McKinseyMacro.analyze(stock_data)
-    elif analyzer_type == "morgan_dcf":
-        return MorganDCF.analyze(stock_data)
-    elif analyzer_type == "academic_quant":
-        return AcademicQuant.analyze(stock_data)
-    elif analyzer_type == "chart_pattern":
-        return ChartPattern.analyze(stock_data)
-    else:
+    fn = _build_analyzer_fn(analyzer_type, stock_data, params)
+    if fn is None:
         return {"error": "未実装の分析タイプ"}
+    return fn()
 
 
 if __name__ == "__main__":

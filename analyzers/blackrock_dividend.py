@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+from .stock_data import StockDataFetcher
 
 
 class BlackRockDividend:
@@ -16,9 +17,9 @@ class BlackRockDividend:
         dividends = stock_data.get("dividends")
         history = stock_data.get("history")
         ticker = stock_data.get("ticker", "N/A")
-        company_name = info.get("longName", info.get("shortName", ticker))
+        company_name = StockDataFetcher.get_display_name(info, ticker)
 
-        current_price = info.get("currentPrice") or info.get("regularMarketPrice", 0)
+        current_price = StockDataFetcher.get_current_price(info)
 
         # 配当利回り分析
         yield_analysis = BlackRockDividend._yield_analysis(info)
@@ -62,8 +63,8 @@ class BlackRockDividend:
 
     @staticmethod
     def _yield_analysis(info):
-        div_yield = info.get("dividendYield")
-        div_yield_pct = (div_yield * 100 if div_yield and div_yield < 1 else div_yield * 1 if div_yield else 0) if div_yield else 0
+        div_yield = info.get("dividendYield") or 0
+        div_yield_pct = div_yield * 100 if div_yield < 1 else div_yield
         five_yr_avg = info.get("fiveYearAvgDividendYield")
 
         if div_yield_pct > 5:
@@ -142,9 +143,9 @@ class BlackRockDividend:
         score = 5  # ベースライン
         reasons = []
 
-        payout = info.get("payoutRatio")
+        payout = info.get("payoutRatio")  # _enrich_infoで小数形式に正規化済み
         if payout is not None:
-            payout_pct = payout * 100 if payout < 1 else payout
+            payout_pct = payout * 100
             if payout_pct < 40:
                 score += 2
                 reasons.append(f"低い配当性向 ({payout_pct:.0f}%)")
@@ -155,9 +156,8 @@ class BlackRockDividend:
                 score -= 2
                 reasons.append(f"高い配当性向 ({payout_pct:.0f}%) - 減配リスク")
 
-        de = info.get("debtToEquity")
-        if de is not None:
-            de_ratio = de / 100 if de > 10 else de
+        de_ratio = info.get("debtToEquity")  # _enrich_infoで小数形式に正規化済み
+        if de_ratio is not None:
             if de_ratio < 0.5:
                 score += 1
                 reasons.append("低い負債比率")
@@ -184,13 +184,8 @@ class BlackRockDividend:
 
     @staticmethod
     def _income_projection(info, investment_amount, growth_analysis):
-        div_yield = info.get("dividendYield", 0)
-        if div_yield and div_yield < 1:
-            div_yield_pct = div_yield
-        elif div_yield:
-            div_yield_pct = div_yield / 100
-        else:
-            div_yield_pct = 0
+        div_yield = info.get("dividendYield") or 0
+        div_yield_pct = div_yield if div_yield < 1 else div_yield / 100
 
         cagr = growth_analysis.get("cagr_pct", 3)
         growth_rate = cagr / 100
@@ -220,13 +215,8 @@ class BlackRockDividend:
         if not current_price or current_price == 0:
             return {"note": "現在価格が取得できません"}
 
-        div_yield = info.get("dividendYield", 0)
-        if div_yield and div_yield < 1:
-            div_yield_pct = div_yield
-        elif div_yield:
-            div_yield_pct = div_yield / 100
-        else:
-            div_yield_pct = 0
+        div_yield = info.get("dividendYield") or 0
+        div_yield_pct = div_yield if div_yield < 1 else div_yield / 100
 
         price_growth = 0.05  # 年間5%の株価成長を想定
         div_growth = growth_analysis.get("cagr_pct", 3) / 100

@@ -16,7 +16,7 @@ class BridgewaterRisk:
         info = stock_data.get("info", {})
         history = stock_data.get("history")
         ticker = stock_data.get("ticker", "N/A")
-        company_name = info.get("longName", info.get("shortName", ticker))
+        company_name = StockDataFetcher.get_display_name(info, ticker)
 
         if history is None or history.empty:
             return {"analyzer": BridgewaterRisk.NAME, "error": "データなし"}

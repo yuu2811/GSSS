@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+from .stock_data import StockDataFetcher
 
 
 class ChartPattern:
@@ -15,7 +16,7 @@ class ChartPattern:
         info = stock_data.get("info", {})
         history = stock_data.get("history")
         ticker = stock_data.get("ticker", "N/A")
-        company_name = info.get("longName", info.get("shortName", ticker))
+        company_name = StockDataFetcher.get_display_name(info, ticker)
 
         if history is None or history.empty:
             return {"analyzer": ChartPattern.NAME, "error": "価格データが取得できません"}
