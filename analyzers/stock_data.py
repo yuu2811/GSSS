@@ -295,7 +295,7 @@ class StockDataFetcher:
         # --- フリーキャッシュフロー ---
         if not info.get("freeCashflow"):
             fcf = _safe_get_latest(cashflow, "Free Cash Flow")
-            if fcf:
+            if fcf is not None:
                 info["freeCashflow"] = fcf
 
         # --- 営業キャッシュフロー ---

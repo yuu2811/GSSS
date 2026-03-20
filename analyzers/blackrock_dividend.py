@@ -62,7 +62,7 @@ class BlackRockDividend:
     @staticmethod
     def _yield_analysis(info):
         div_yield = info.get("dividendYield") or 0
-        div_yield_pct = div_yield * 100 if div_yield < 1 else div_yield
+        div_yield_pct = div_yield * 100  # _enrich_infoで小数形式に正規化済み
         five_yr_avg = info.get("fiveYearAvgDividendYield")
 
         if div_yield_pct > 5:
@@ -164,10 +164,10 @@ class BlackRockDividend:
                 reasons.append("高い負債比率 - 配当持続性にリスク")
 
         fcf = info.get("freeCashflow")
-        if fcf and fcf > 0:
+        if fcf is not None and fcf > 0:
             score += 1
             reasons.append("プラスのフリーキャッシュフロー")
-        elif fcf and fcf < 0:
+        elif fcf is not None and fcf < 0:
             score -= 2
             reasons.append("マイナスのフリーキャッシュフロー - 要警戒")
 

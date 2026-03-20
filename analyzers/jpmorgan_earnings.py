@@ -115,11 +115,11 @@ class JPMorganEarnings:
     @staticmethod
     def _key_metrics(info, financials):
         metrics = [
-            {"name": "売上高成長率", "value": f"{info.get('revenueGrowth', 0)*100:.1f}%" if info.get('revenueGrowth') else "N/A", "importance": "高"},
-            {"name": "営業利益率", "value": f"{info.get('operatingMargins', 0)*100:.1f}%" if info.get('operatingMargins') else "N/A", "importance": "高"},
-            {"name": "純利益率", "value": f"{info.get('profitMargins', 0)*100:.1f}%" if info.get('profitMargins') else "N/A", "importance": "高"},
-            {"name": "ROE", "value": f"{info.get('returnOnEquity', 0)*100:.1f}%" if info.get('returnOnEquity') else "N/A", "importance": "中"},
-            {"name": "フリーキャッシュフロー", "value": f"¥{info.get('freeCashflow', 0):,.0f}" if info.get('freeCashflow') else "N/A", "importance": "高"},
+            {"name": "売上高成長率", "value": f"{info.get('revenueGrowth', 0)*100:.1f}%" if info.get('revenueGrowth') is not None else "N/A", "importance": "高"},
+            {"name": "営業利益率", "value": f"{info.get('operatingMargins', 0)*100:.1f}%" if info.get('operatingMargins') is not None else "N/A", "importance": "高"},
+            {"name": "純利益率", "value": f"{info.get('profitMargins', 0)*100:.1f}%" if info.get('profitMargins') is not None else "N/A", "importance": "高"},
+            {"name": "ROE", "value": f"{info.get('returnOnEquity', 0)*100:.1f}%" if info.get('returnOnEquity') is not None else "N/A", "importance": "中"},
+            {"name": "フリーキャッシュフロー", "value": f"¥{info.get('freeCashflow', 0):,.0f}" if info.get('freeCashflow') is not None else "N/A", "importance": "高"},
         ]
         return metrics
 

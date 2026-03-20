@@ -181,8 +181,8 @@ class GoldmanScreener:
         div_rate = info.get("dividendRate")
         payout_ratio = info.get("payoutRatio")
 
-        if div_yield:
-            div_yield_pct = div_yield * 100 if div_yield < 1 else div_yield
+        if div_yield is not None:
+            div_yield_pct = div_yield * 100  # _enrich_infoで小数形式に正規化済み
         else:
             div_yield_pct = 0
 
@@ -302,7 +302,7 @@ class GoldmanScreener:
         risk = 5  # ベースライン
 
         beta = info.get("beta")
-        if beta:
+        if beta is not None:
             if beta > 1.5:
                 risk += 2
             elif beta > 1.2:
@@ -325,7 +325,7 @@ class GoldmanScreener:
         risk = max(1, min(10, risk))
 
         reasons = []
-        if beta:
+        if beta is not None:
             reasons.append(f"ベータ: {beta:.2f}")
         reasons.append(f"負債健全性: {debt_analysis.get('health', 'N/A')}")
         reasons.append(f"バリュエーション: {pe_analysis.get('assessment', 'N/A')}")

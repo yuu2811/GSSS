@@ -92,8 +92,8 @@ class MorganDCF:
 
         # 成長率の推定
         rev_growth = info.get("revenueGrowth")
-        if rev_growth:
-            base_growth = rev_growth if rev_growth < 1 else rev_growth / 100
+        if rev_growth is not None:
+            base_growth = rev_growth  # _enrich_infoで小数形式に正規化済み
         elif len(rev_hist) >= 2:
             latest = rev_hist[-1]["value"]
             prev = rev_hist[-2]["value"]

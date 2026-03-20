@@ -100,7 +100,7 @@ class RenaissanceQuant:
 
         roe = info.get("returnOnEquity")
         if roe is not None:
-            roe_pct = roe * 100 if roe < 1 else roe
+            roe_pct = roe * 100  # _enrich_infoで小数形式に正規化済み
             if roe_pct > 15:
                 score += 25
                 details.append(f"ROE {roe_pct:.1f}% （高い）")
@@ -113,7 +113,7 @@ class RenaissanceQuant:
 
         margin = info.get("operatingMargins")
         if margin is not None:
-            margin_pct = margin * 100 if margin < 1 else margin
+            margin_pct = margin * 100  # _enrich_infoで小数形式に正規化済み
             if margin_pct > 20:
                 score += 25
                 details.append(f"営業利益率 {margin_pct:.1f}% （高い）")
@@ -138,7 +138,7 @@ class RenaissanceQuant:
 
         roa = info.get("returnOnAssets")
         if roa is not None:
-            roa_pct = roa * 100 if roa < 1 else roa
+            roa_pct = roa * 100  # _enrich_infoで小数形式に正規化済み
             if roa_pct > 10:
                 score += 25
                 details.append(f"ROA {roa_pct:.1f}% （高い）")
@@ -218,7 +218,7 @@ class RenaissanceQuant:
 
         rev_growth = info.get("revenueGrowth")
         if rev_growth is not None:
-            rg_pct = rev_growth * 100 if rev_growth < 1 else rev_growth
+            rg_pct = rev_growth * 100  # _enrich_infoで小数形式に正規化済み
             if rg_pct > 15:
                 score += 30
                 details.append(f"売上成長率 {rg_pct:.1f}% （高成長）")
@@ -234,7 +234,7 @@ class RenaissanceQuant:
 
         eps_growth = info.get("earningsGrowth")
         if eps_growth is not None:
-            eg_pct = eps_growth * 100 if eps_growth < 1 else eps_growth
+            eg_pct = eps_growth * 100  # _enrich_infoで小数形式に正規化済み
             if eg_pct > 20:
                 score += 35
                 details.append(f"EPS成長率 {eg_pct:.1f}% （高成長）")
@@ -249,7 +249,7 @@ class RenaissanceQuant:
 
         margin_trend = info.get("operatingMargins")
         if margin_trend is not None:
-            m_pct = margin_trend * 100 if margin_trend < 1 else margin_trend
+            m_pct = margin_trend * 100  # _enrich_infoで小数形式に正規化済み
             if m_pct > 15:
                 score += 20
                 details.append(f"営業利益率 {m_pct:.1f}% （高マージン）")
