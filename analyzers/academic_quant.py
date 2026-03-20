@@ -87,7 +87,7 @@ class AcademicQuant:
 
         # Profitability (RMW)
         roe = info.get("returnOnEquity")
-        if roe:
+        if roe is not None:
             roe_pct = roe * 100 if abs(roe) < 1 else roe
             if roe_pct > 15:
                 score += 20
@@ -270,7 +270,7 @@ class AcademicQuant:
 
         # Growth stability
         rev_growth = info.get("revenueGrowth")
-        if rev_growth:
+        if rev_growth is not None:
             rg = rev_growth * 100 if abs(rev_growth) < 1 else rev_growth
             if rg > 10:
                 score += 20
@@ -300,7 +300,7 @@ class AcademicQuant:
 
         # ROA
         roa = info.get("returnOnAssets")
-        if roa:
+        if roa is not None:
             roa_pct = roa * 100 if abs(roa) < 1 else roa
             if roa_pct > 8:
                 score += 15
@@ -570,8 +570,8 @@ class AcademicQuant:
         metrics = {}
 
         eps_growth = info.get("earningsGrowth")
-        if eps_growth:
-            eg = eps_growth * 100 if abs(eps_growth) < 5 else eps_growth
+        if eps_growth is not None:
+            eg = eps_growth * 100 if abs(eps_growth) < 1 else eps_growth
             if eg > 20:
                 score += 40
                 details.append(f"EPS成長率 {eg:+.1f}% — 強いポジティブサプライズ期待")
@@ -587,8 +587,8 @@ class AcademicQuant:
             metrics["EPS成長率"] = f"{eg:+.1f}%"
 
         rev_growth = info.get("revenueGrowth")
-        if rev_growth:
-            rg = rev_growth * 100 if abs(rev_growth) < 5 else rev_growth
+        if rev_growth is not None:
+            rg = rev_growth * 100 if abs(rev_growth) < 1 else rev_growth
             if rg > 15:
                 score += 30
                 details.append(f"売上成長 {rg:+.1f}% — 好決算持続")

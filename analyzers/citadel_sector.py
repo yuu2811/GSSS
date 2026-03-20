@@ -73,7 +73,7 @@ class CitadelSector:
                 # リターン計算
                 ret_1m = ((current / close.iloc[-22]) - 1) * 100 if len(close) >= 22 else None
                 ret_3m = ((current / close.iloc[-66]) - 1) * 100 if len(close) >= 66 else None
-                ret_6m = ((current / close.iloc[0]) - 1) * 100
+                ret_6m = ((current / close.iloc[0]) - 1) * 100 if close.iloc[0] != 0 else 0
 
                 results.append({
                     "sector": sector_name,

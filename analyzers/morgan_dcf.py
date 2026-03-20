@@ -146,7 +146,7 @@ class MorganDCF:
         else:
             # デフォルトのFCFマージン
             op_margin = info.get("operatingMargins", 0.10)
-            if op_margin and op_margin < 1:
+            if op_margin is not None and op_margin < 1:
                 fcf_margin = op_margin * 0.7  # 営業利益率の70%をFCFマージンと推定
             else:
                 fcf_margin = 0.08
@@ -178,7 +178,7 @@ class MorganDCF:
         cost_of_equity = risk_free_rate + beta * market_premium
 
         de_ratio = info.get("debtToEquity")  # _enrich_infoで小数形式に正規化済み
-        de = de_ratio if de_ratio else 0.3
+        de = de_ratio if de_ratio is not None else 0.3
 
         cost_of_debt = 0.015  # 日本企業の平均借入金利
         tax_rate = 0.30  # 実効税率

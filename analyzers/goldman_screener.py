@@ -167,10 +167,10 @@ class GoldmanScreener:
             score = 2
 
         return {
-            "debt_to_equity": round(de_ratio, 2) if de_ratio else None,
+            "debt_to_equity": round(de_ratio, 2) if de_ratio is not None else None,
             "total_debt": total_debt,
             "total_cash": total_cash,
-            "net_debt": total_debt - total_cash if total_debt and total_cash else None,
+            "net_debt": total_debt - total_cash if total_debt is not None and total_cash is not None else None,
             "health": health,
             "score": score,
         }

@@ -99,7 +99,7 @@ class RenaissanceQuant:
         details = []
 
         roe = info.get("returnOnEquity")
-        if roe:
+        if roe is not None:
             roe_pct = roe * 100 if roe < 1 else roe
             if roe_pct > 15:
                 score += 25
@@ -112,7 +112,7 @@ class RenaissanceQuant:
                 details.append(f"ROE {roe_pct:.1f}% （低い）")
 
         margin = info.get("operatingMargins")
-        if margin:
+        if margin is not None:
             margin_pct = margin * 100 if margin < 1 else margin
             if margin_pct > 20:
                 score += 25
@@ -137,7 +137,7 @@ class RenaissanceQuant:
                 details.append(f"D/E比率 {de_ratio:.2f} （高い）")
 
         roa = info.get("returnOnAssets")
-        if roa:
+        if roa is not None:
             roa_pct = roa * 100 if roa < 1 else roa
             if roa_pct > 10:
                 score += 25
@@ -217,7 +217,7 @@ class RenaissanceQuant:
         details = []
 
         rev_growth = info.get("revenueGrowth")
-        if rev_growth:
+        if rev_growth is not None:
             rg_pct = rev_growth * 100 if rev_growth < 1 else rev_growth
             if rg_pct > 15:
                 score += 30
@@ -233,7 +233,7 @@ class RenaissanceQuant:
                 details.append(f"売上成長率 {rg_pct:.1f}% （減収）")
 
         eps_growth = info.get("earningsGrowth")
-        if eps_growth:
+        if eps_growth is not None:
             eg_pct = eps_growth * 100 if eps_growth < 1 else eps_growth
             if eg_pct > 20:
                 score += 35
@@ -248,7 +248,7 @@ class RenaissanceQuant:
                 details.append(f"EPS成長率 {eg_pct:.1f}% （減益）")
 
         margin_trend = info.get("operatingMargins")
-        if margin_trend:
+        if margin_trend is not None:
             m_pct = margin_trend * 100 if margin_trend < 1 else margin_trend
             if m_pct > 15:
                 score += 20
@@ -292,7 +292,7 @@ class RenaissanceQuant:
 
         # 機関投資家保有
         inst = info.get("heldPercentInstitutions")
-        if inst:
+        if inst is not None:
             inst_pct = inst * 100 if inst < 1 else inst
             if inst_pct > 70:
                 score += 30
@@ -306,7 +306,7 @@ class RenaissanceQuant:
 
         # ショートインタレスト
         short_pct = info.get("shortPercentOfFloat")
-        if short_pct:
+        if short_pct is not None:
             sp = short_pct * 100 if short_pct < 1 else short_pct
             if sp < 3:
                 score += 20
@@ -320,7 +320,7 @@ class RenaissanceQuant:
 
         # インサイダー保有
         insider = info.get("heldPercentInsiders")
-        if insider:
+        if insider is not None:
             ins_pct = insider * 100 if insider < 1 else insider
             if ins_pct > 10:
                 score += 15

@@ -283,13 +283,13 @@ class BlackRockDividend:
         warnings = []
         is_trap = False
 
-        div_yield = info.get("dividendYield", 0)
-        if div_yield and ((div_yield < 1 and div_yield > 0.06) or (div_yield >= 1 and div_yield > 6)):
+        div_yield = info.get("dividendYield", 0)  # _enrich_infoで小数形式に正規化済み
+        if div_yield is not None and div_yield > 0.06:
             warnings.append("利回り6%超: 株価下落による見かけの高利回りの可能性")
             is_trap = True
 
-        payout = info.get("payoutRatio")
-        if payout and (payout > 0.9 or (payout > 1 and payout < 100 and payout > 90)):
+        payout = info.get("payoutRatio")  # _enrich_infoで小数形式に正規化済み
+        if payout is not None and payout > 0.9:
             warnings.append("配当性向90%超: 減配リスクが高い")
             is_trap = True
 
