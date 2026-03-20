@@ -19,6 +19,8 @@ from analyzers import (
     VanguardETF,
     McKinseyMacro,
     MorganDCF,
+    AcademicQuant,
+    ChartPattern,
 )
 
 app = Flask(__name__)
@@ -93,6 +95,20 @@ ANALYZERS = {
         "short": "MS DCF",
         "icon": "🧮",
         "description": "5年間の収益予測、WACC、ターミナルバリュー、感度分析による理論株価算出",
+        "needs_ticker": True,
+    },
+    "academic_quant": {
+        "name": "Academic Paper 定量分析",
+        "short": "学術定量分析",
+        "icon": "🎓",
+        "description": "Fama-French、モメンタム、低ボラティリティ、QMJ等の学術論文ベースファクター分析",
+        "needs_ticker": True,
+    },
+    "chart_pattern": {
+        "name": "チャートパターン分析",
+        "short": "チャートパターン",
+        "icon": "📐",
+        "description": "ヘッドアンドショルダー、ダブルトップ、三角保ち合い等のパターン認識とトレンド分析",
         "needs_ticker": True,
     },
 }
@@ -208,6 +224,10 @@ def _run_analyzer(analyzer_type: str, stock_data: dict, params: dict) -> dict:
         return McKinseyMacro.analyze(stock_data)
     elif analyzer_type == "morgan_dcf":
         return MorganDCF.analyze(stock_data)
+    elif analyzer_type == "academic_quant":
+        return AcademicQuant.analyze(stock_data)
+    elif analyzer_type == "chart_pattern":
+        return ChartPattern.analyze(stock_data)
     else:
         return {"error": "未実装の分析タイプ"}
 
