@@ -1,7 +1,5 @@
 """Renaissance Technologies スタイル 定量スクリーニング"""
 
-import numpy as np
-import pandas as pd
 from .stock_data import StockDataFetcher
 
 

@@ -1,8 +1,5 @@
 """Vanguard スタイル ETFポートフォリオ構築"""
 
-import numpy as np
-
-
 class VanguardETF:
     """バンガード流のETFポートフォリオ構築"""
 

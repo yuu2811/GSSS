@@ -154,7 +154,8 @@ class BridgewaterRisk:
             recovered = recovery[recovery >= 0]
             if not recovered.empty:
                 recovery_date = recovered.index[0]
-                recovery_days = (recovery_date - dd_idx).days if hasattr(recovery_date, 'days') or hasattr(dd_idx, 'days') else len(drawdown.loc[dd_idx:recovery_date])
+                delta = recovery_date - dd_idx
+                recovery_days = delta.days if hasattr(delta, 'days') else len(drawdown.loc[dd_idx:recovery_date])
             else:
                 recovery_date = None
                 recovery_days = "未回復"

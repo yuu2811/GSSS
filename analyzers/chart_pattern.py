@@ -1,7 +1,6 @@
 """チャートパターン認識 + トレンド分析"""
 
 import numpy as np
-import pandas as pd
 from .stock_data import StockDataFetcher
 
 

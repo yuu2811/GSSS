@@ -4,7 +4,6 @@ GSSS - Goldman Sachs Style Stock Screener
 """
 
 from flask import Flask, render_template, request, jsonify
-import json
 import traceback
 
 from analyzers import (

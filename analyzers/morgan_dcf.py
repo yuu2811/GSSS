@@ -1,7 +1,5 @@
 """Morgan Stanley スタイル DCFバリュエーション"""
 
-import numpy as np
-import pandas as pd
 from .stock_data import StockDataFetcher
 
 

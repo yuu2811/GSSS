@@ -1,7 +1,5 @@
 """Citadel スタイル セクターローテーション戦略"""
 
-import numpy as np
-import pandas as pd
 import yfinance as yf
 
 
@@ -84,7 +82,7 @@ class CitadelSector:
                     "return_1m": round(ret_1m, 1) if ret_1m else None,
                     "return_3m": round(ret_3m, 1) if ret_3m else None,
                     "return_6m": round(ret_6m, 1),
-                    "momentum": "上昇" if (ret_1m and ret_1m > 0) else "下降",
+                    "momentum": "上昇" if (ret_1m is not None and ret_1m > 0) else ("下降" if ret_1m is not None else "データなし"),
                 })
             except Exception:
                 continue

@@ -1,6 +1,5 @@
 """Goldman Sachs スタイル株式スクリーニング分析"""
 
-import numpy as np
 from .stock_data import StockDataFetcher
 
 
@@ -126,7 +125,7 @@ class GoldmanScreener:
                 trend = "データ不足"
             elif all(g > 0 for g in growth_rates):
                 trend = "安定成長"
-            elif growth_rates[-1] > growth_rates[0] if len(growth_rates) > 1 else growth_rates[-1] > 0:
+            elif (growth_rates[-1] > growth_rates[0]) if len(growth_rates) > 1 else (growth_rates[-1] > 0):
                 trend = "加速成長"
             elif all(g < 0 for g in growth_rates):
                 trend = "減収傾向"

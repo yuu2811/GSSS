@@ -1,7 +1,5 @@
 """BlackRock スタイル 配当インカム分析"""
 
-import numpy as np
-import pandas as pd
 from .stock_data import StockDataFetcher
 
 

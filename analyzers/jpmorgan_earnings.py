@@ -1,6 +1,5 @@
 """JPMorgan Chase スタイル 決算分析"""
 
-import numpy as np
 import pandas as pd
 from .stock_data import StockDataFetcher
 
@@ -159,8 +158,8 @@ class JPMorganEarnings:
 
     @staticmethod
     def _positioning_strategy(earnings_history, implied_move, current_price):
-        beat_rate = earnings_history.get("beat_rate", 50)
-        est_move = implied_move.get("estimated_move_pct", 5)
+        beat_rate = earnings_history.get("beat_rate") or 50
+        est_move = implied_move.get("estimated_move_pct") or 5.0
 
         strategies = []
 
