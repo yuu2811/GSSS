@@ -168,6 +168,73 @@ def analyze():
         return jsonify({"error": f"分析中にエラーが発生しました: {str(e)}"}), 500
 
 
+@app.route("/api/analyze_all", methods=["POST"])
+def analyze_all():
+    """銘柄コードを受け取り、全分析を一括実行"""
+    try:
+        data = request.get_json()
+        ticker = data.get("ticker", "").strip()
+        params = data.get("params", {})
+
+        if not ticker:
+            return jsonify({"error": "銘柄コードを入力してください"}), 400
+
+        stock_data = StockDataFetcher.fetch(ticker)
+        if not stock_data.get("info"):
+            return jsonify({"error": f"銘柄 {ticker} のデータを取得できません"}), 404
+
+        results = {}
+        errors = {}
+
+        # 銘柄必要な分析
+        ticker_analyzers = [
+            ("goldman", lambda sd: GoldmanScreener.analyze(sd)),
+            ("morgan_technical", lambda sd: MorganTechnical.analyze(sd)),
+            ("bridgewater", lambda sd: BridgewaterRisk.analyze(sd)),
+            ("jpmorgan", lambda sd: JPMorganEarnings.analyze(sd)),
+            ("blackrock", lambda sd: BlackRockDividend.analyze(sd, investment_amount=float(params.get("investment_amount", 1_000_000)))),
+            ("renaissance", lambda sd: RenaissanceQuant.analyze(sd)),
+            ("morgan_dcf", lambda sd: MorganDCF.analyze(sd)),
+            ("academic_quant", lambda sd: AcademicQuant.analyze(sd)),
+            ("chart_pattern", lambda sd: ChartPattern.analyze(sd)),
+        ]
+
+        for key, fn in ticker_analyzers:
+            try:
+                results[key] = _safe_serialize(fn(stock_data))
+            except Exception as e:
+                errors[key] = str(e)
+
+        # 銘柄不要な分析
+        market_analyzers = [
+            ("citadel", lambda: CitadelSector.analyze(stock_data)),
+            ("mckinsey", lambda: McKinseyMacro.analyze(stock_data)),
+            ("vanguard", lambda: VanguardETF.analyze(
+                stock_data,
+                risk_profile=params.get("risk_profile", "バランス型"),
+                investment_amount=float(params.get("investment_amount", 1_000_000)),
+                age=int(params.get("age", 40)),
+            )),
+        ]
+
+        for key, fn in market_analyzers:
+            try:
+                results[key] = _safe_serialize(fn())
+            except Exception as e:
+                errors[key] = str(e)
+
+        return jsonify({
+            "success": True,
+            "results": results,
+            "errors": errors,
+            "analyzers": ANALYZERS,
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": f"一括分析中にエラーが発生しました: {str(e)}"}), 500
+
+
 @app.route("/api/search", methods=["GET"])
 def search_stock():
     """銘柄コード・銘柄名で検索"""
