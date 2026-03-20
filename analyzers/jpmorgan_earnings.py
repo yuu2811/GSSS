@@ -1,7 +1,9 @@
 """JPMorgan Chase スタイル 決算分析"""
 
+from __future__ import annotations
+
 import pandas as pd
-from .stock_data import StockDataFetcher
+from .stock_data import StockDataFetcher, StockData, AnalysisResult
 
 
 class JPMorganEarnings:
@@ -11,7 +13,7 @@ class JPMorganEarnings:
     DESCRIPTION = "決算履歴、コンセンサス予想、オプションインプライドムーブ、ポジション戦略"
 
     @staticmethod
-    def analyze(stock_data: dict) -> dict:
+    def analyze(stock_data: StockData) -> AnalysisResult:
         info = stock_data.get("info", {})
         history = stock_data.get("history")
         earnings_dates = stock_data.get("earnings_dates")

@@ -1,5 +1,7 @@
 """Citadel スタイル セクターローテーション戦略"""
 
+from __future__ import annotations
+
 import yfinance as yf
 
 

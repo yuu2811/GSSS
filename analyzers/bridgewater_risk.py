@@ -1,8 +1,10 @@
 """Bridgewater Associates スタイル リスク評価フレームワーク"""
 
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
-from .stock_data import StockDataFetcher
+from .stock_data import StockDataFetcher, StockData, AnalysisResult
 
 
 class BridgewaterRisk:
@@ -12,7 +14,7 @@ class BridgewaterRisk:
     DESCRIPTION = "ボラティリティ、ベータ、最大ドローダウン、ストレステスト、ヘッジ提案"
 
     @staticmethod
-    def analyze(stock_data: dict) -> dict:
+    def analyze(stock_data: StockData) -> AnalysisResult:
         info = stock_data.get("info", {})
         history = stock_data.get("history")
         ticker = stock_data.get("ticker", "N/A")
@@ -149,7 +151,6 @@ class BridgewaterRisk:
         # 回復時間を計算
         if max_dd < 0:
             dd_idx = drawdown.idxmin()
-            peak_before = cummax.loc[:dd_idx].idxmax()
             recovery = drawdown.loc[dd_idx:]
             recovered = recovery[recovery >= 0]
             if not recovered.empty:
@@ -190,7 +191,7 @@ class BridgewaterRisk:
         return {"level": level, "impact": impact, "sector": sector}
 
     @staticmethod
-    def _stress_test(close, returns, info):
+    def _stress_test(close, returns, _info=None):
         current = close.iloc[-1]
         annual_vol = returns.std() * np.sqrt(252)
 
@@ -220,7 +221,7 @@ class BridgewaterRisk:
         return {"current_price": round(current, 0), "scenarios": scenarios}
 
     @staticmethod
-    def _earnings_risk(info, returns):
+    def _earnings_risk(_info, returns):
         # 決算日前後のボラティリティ推定
         avg_daily_move = returns.abs().mean() * 100
 

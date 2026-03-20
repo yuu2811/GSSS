@@ -1,6 +1,8 @@
 """Goldman Sachs スタイル株式スクリーニング分析"""
 
-from .stock_data import StockDataFetcher
+from __future__ import annotations
+
+from .stock_data import StockDataFetcher, StockData, AnalysisResult
 
 
 class GoldmanScreener:
@@ -10,7 +12,7 @@ class GoldmanScreener:
     DESCRIPTION = "P/E比率、収益成長、負債比率、配当利回り、競争優位性を総合的に分析"
 
     @staticmethod
-    def analyze(stock_data: dict) -> dict:
+    def analyze(stock_data: StockData) -> AnalysisResult:
         info = stock_data.get("info", {})
         history = stock_data.get("history")
         financials = stock_data.get("financials")

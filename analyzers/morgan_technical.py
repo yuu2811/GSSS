@@ -1,6 +1,8 @@
 """Morgan Stanley スタイル テクニカル分析"""
 
-from .stock_data import StockDataFetcher
+from __future__ import annotations
+
+from .stock_data import StockDataFetcher, StockData, AnalysisResult
 
 
 class MorganTechnical:
@@ -10,7 +12,7 @@ class MorganTechnical:
     DESCRIPTION = "トレンド分析、移動平均、RSI、MACD、ボリンジャーバンドなど主要テクニカル指標を網羅"
 
     @staticmethod
-    def analyze(stock_data: dict) -> dict:
+    def analyze(stock_data: StockData) -> AnalysisResult:
         info = stock_data.get("info", {})
         history = stock_data.get("history")
         ticker = stock_data.get("ticker", "N/A")

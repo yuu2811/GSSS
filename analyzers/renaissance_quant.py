@@ -1,6 +1,9 @@
 """Renaissance Technologies スタイル 定量スクリーニング"""
 
-from .stock_data import StockDataFetcher
+from __future__ import annotations
+
+from .stock_data import StockDataFetcher, StockData, AnalysisResult
+from .scoring import weighted_composite
 
 
 class RenaissanceQuant:
@@ -10,7 +13,7 @@ class RenaissanceQuant:
     DESCRIPTION = "バリュー、クオリティ、モメンタム、成長、センチメント各ファクターの複合スコア"
 
     @staticmethod
-    def analyze(stock_data: dict) -> dict:
+    def analyze(stock_data: StockData) -> AnalysisResult:
         info = stock_data.get("info", {})
         history = stock_data.get("history")
         ticker = stock_data.get("ticker", "N/A")
@@ -348,29 +351,11 @@ class RenaissanceQuant:
             "センチメント": sentiment["score"],
         }
 
-        composite = sum(scores[k] * weights[k] for k in weights)
-
-        if composite >= 75:
-            rating = "非常に魅力的"
-            recommendation = "強い買い推奨"
-        elif composite >= 60:
-            rating = "魅力的"
-            recommendation = "買い推奨"
-        elif composite >= 45:
-            rating = "中立"
-            recommendation = "保持/様子見"
-        elif composite >= 30:
-            rating = "やや弱い"
-            recommendation = "慎重に検討"
-        else:
-            rating = "弱い"
-            recommendation = "見送り推奨"
-
-        return {
-            "total_score": round(composite, 1),
-            "max_score": 100,
-            "factor_scores": scores,
-            "weights": {k: f"{v*100:.0f}%" for k, v in weights.items()},
-            "rating": rating,
-            "recommendation": recommendation,
-        }
+        thresholds = [
+            (75, "非常に魅力的", "強い買い推奨"),
+            (60, "魅力的", "買い推奨"),
+            (45, "中立", "保持/様子見"),
+            (30, "やや弱い", "慎重に検討"),
+            (0, "弱い", "見送り推奨"),
+        ]
+        return weighted_composite(scores, weights, thresholds)

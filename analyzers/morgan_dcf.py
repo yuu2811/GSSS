@@ -1,6 +1,8 @@
 """Morgan Stanley スタイル DCFバリュエーション"""
 
-from .stock_data import StockDataFetcher
+from __future__ import annotations
+
+from .stock_data import StockDataFetcher, StockData, AnalysisResult
 
 
 class MorganDCF:
@@ -10,7 +12,7 @@ class MorganDCF:
     DESCRIPTION = "5年間の収益予測、WACC推定、ターミナルバリュー、感度分析"
 
     @staticmethod
-    def analyze(stock_data: dict) -> dict:
+    def analyze(stock_data: StockData) -> AnalysisResult:
         info = stock_data.get("info", {})
         financials = stock_data.get("financials")
         cashflow = stock_data.get("cashflow")

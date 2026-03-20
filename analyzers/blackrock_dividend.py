@@ -1,6 +1,10 @@
 """BlackRock スタイル 配当インカム分析"""
 
-from .stock_data import StockDataFetcher
+from __future__ import annotations
+
+from datetime import datetime
+
+from .stock_data import StockDataFetcher, StockData, AnalysisResult
 
 
 class BlackRockDividend:
@@ -10,7 +14,7 @@ class BlackRockDividend:
     DESCRIPTION = "配当利回り、増配履歴、配当安全性スコア、DRIP複利シミュレーション"
 
     @staticmethod
-    def analyze(stock_data: dict, investment_amount: float = 1_000_000) -> dict:
+    def analyze(stock_data: StockData, investment_amount: float = 1_000_000) -> AnalysisResult:
         info = stock_data.get("info", {})
         dividends = stock_data.get("dividends")
         history = stock_data.get("history")
@@ -182,14 +186,13 @@ class BlackRockDividend:
 
     @staticmethod
     def _income_projection(info, investment_amount, growth_analysis):
-        div_yield = info.get("dividendYield") or 0  # _enrich_infoで小数形式に正規化済み
-        div_yield_pct = div_yield
+        div_yield = info.get("dividendYield") or 0  # 小数形式（例: 0.03 = 3%）
 
         cagr = growth_analysis.get("cagr_pct", 3)
         growth_rate = cagr / 100
 
         projections = []
-        annual_income = investment_amount * div_yield_pct
+        annual_income = investment_amount * div_yield
 
         for year in range(1, 21):
             income = annual_income * ((1 + growth_rate) ** (year - 1))
@@ -197,7 +200,7 @@ class BlackRockDividend:
                 "year": year,
                 "annual_income": round(income, 0),
                 "monthly_income": round(income / 12, 0),
-                "yield_on_cost": round(div_yield_pct * 100 * ((1 + growth_rate) ** (year - 1)), 2),
+                "yield_on_cost": round(div_yield * 100 * ((1 + growth_rate) ** (year - 1)), 2),
             })
 
         return {
@@ -213,8 +216,7 @@ class BlackRockDividend:
         if not current_price or current_price == 0:
             return {"note": "現在価格が取得できません"}
 
-        div_yield = info.get("dividendYield") or 0  # _enrich_infoで小数形式に正規化済み
-        div_yield_pct = div_yield
+        div_yield = info.get("dividendYield") or 0  # 小数形式（例: 0.03 = 3%）
 
         price_growth = 0.05  # 年間5%の株価成長を想定
         div_growth = growth_analysis.get("cagr_pct", 3) / 100
@@ -226,7 +228,7 @@ class BlackRockDividend:
 
         drip_results = []
         for year in range(1, 21):
-            annual_div_per_share = price * div_yield_pct * ((1 + div_growth) ** (year - 1))
+            annual_div_per_share = price * div_yield * ((1 + div_growth) ** (year - 1))
             annual_dividend = shares * annual_div_per_share
             total_dividends += annual_dividend
 
@@ -261,7 +263,6 @@ class BlackRockDividend:
     def _ex_dividend_info(info):
         ex_date = info.get("exDividendDate")
         if ex_date:
-            from datetime import datetime
             try:
                 if isinstance(ex_date, (int, float)):
                     ex_date_str = datetime.fromtimestamp(ex_date).strftime("%Y-%m-%d")

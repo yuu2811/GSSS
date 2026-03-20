@@ -1,7 +1,10 @@
 """Academic Paper ベース 定量ファクター分析"""
 
+from __future__ import annotations
+
 import numpy as np
-from .stock_data import StockDataFetcher
+from .stock_data import StockDataFetcher, StockData, AnalysisResult
+from .scoring import weighted_composite
 
 
 class AcademicQuant:
@@ -11,7 +14,7 @@ class AcademicQuant:
     DESCRIPTION = "Fama-French、モメンタム、低ボラティリティ、QMJ等の学術論文ベースファクター分析"
 
     @staticmethod
-    def analyze(stock_data: dict) -> dict:
+    def analyze(stock_data: StockData) -> AnalysisResult:
         info = stock_data.get("info", {})
         history = stock_data.get("history")
         ticker = stock_data.get("ticker", "N/A")
@@ -213,7 +216,6 @@ class AcademicQuant:
 
                 # Beta estimation
                 if len(returns) >= 120:
-                    mkt_ret = returns.mean() * 252
                     mkt_vol = returns.std() * np.sqrt(252)
                     beta_est = min(max(mkt_vol / 0.20, 0.3), 2.5)
                     if beta_est < 0.8:
@@ -774,29 +776,11 @@ class AcademicQuant:
             "リスクパリティ": rp["score"],
         }
 
-        total = sum(scores[k] * weights[k] for k in weights)
-
-        if total >= 70:
-            rating = "非常に魅力的"
-            rec = "強い買い推奨 — 複数ファクターが支持"
-        elif total >= 55:
-            rating = "魅力的"
-            rec = "買い推奨"
-        elif total >= 40:
-            rating = "中立"
-            rec = "保持/様子見"
-        elif total >= 25:
-            rating = "やや弱い"
-            rec = "慎重に検討"
-        else:
-            rating = "弱い"
-            rec = "見送り推奨"
-
-        return {
-            "total_score": round(total, 1),
-            "max_score": 100,
-            "factor_scores": scores,
-            "weights": {k: f"{v*100:.0f}%" for k, v in weights.items()},
-            "rating": rating,
-            "recommendation": rec,
-        }
+        thresholds = [
+            (70, "非常に魅力的", "強い買い推奨 — 複数ファクターが支持"),
+            (55, "魅力的", "買い推奨"),
+            (40, "中立", "保持/様子見"),
+            (25, "やや弱い", "慎重に検討"),
+            (0, "弱い", "見送り推奨"),
+        ]
+        return weighted_composite(scores, weights, thresholds)

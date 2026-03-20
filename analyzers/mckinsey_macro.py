@@ -1,5 +1,7 @@
 """McKinsey スタイル マクロ経済影響レポート"""
 
+from __future__ import annotations
+
 import yfinance as yf
 
 

@@ -244,19 +244,12 @@ def search_stock():
         return jsonify({"results": []})
 
     try:
-        # 数字のみの場合は従来通りコード検索
-        code = query.replace(".T", "")
-        if code.isdigit():
-            ticker = StockDataFetcher.normalize_ticker(query)
-            name = StockDataFetcher.get_company_name(ticker)
-            return jsonify({"results": [{"ticker": ticker, "name": name}]})
-
-        # 銘柄名で検索（ローカルDB + yfinance）
+        # search_by_name はコード検索・名前検索・yfinanceフォールバックを全て含む
         results = StockDataFetcher.search_by_name(query)
         if results:
             return jsonify({"results": results})
 
-        # それでも見つからない場合はそのまま試行
+        # 最終フォールバック: そのままティッカーとして扱う
         ticker = StockDataFetcher.normalize_ticker(query)
         name = StockDataFetcher.get_company_name(ticker)
         return jsonify({"results": [{"ticker": ticker, "name": name}]})
