@@ -101,7 +101,7 @@ class MorganTechnical:
 
         # ゴールデンクロス / デッドクロス判定
         crossover = None
-        if indicators.get("sma_50") and indicators.get("sma_200"):
+        if indicators.get("sma_50") is not None and indicators.get("sma_200") is not None:
             if indicators["sma_50"] > indicators["sma_200"]:
                 crossover = "ゴールデンクロス圏"
             else:

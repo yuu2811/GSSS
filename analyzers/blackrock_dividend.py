@@ -66,7 +66,7 @@ class BlackRockDividend:
     @staticmethod
     def _yield_analysis(info):
         div_yield = info.get("dividendYield") or 0
-        div_yield_pct = div_yield * 100  # _enrich_infoで小数形式に正規化済み
+        div_yield_pct = div_yield * 100
         five_yr_avg = info.get("fiveYearAvgDividendYield")
 
         if div_yield_pct > 5:
@@ -145,7 +145,7 @@ class BlackRockDividend:
         score = 5  # ベースライン
         reasons = []
 
-        payout = info.get("payoutRatio")  # _enrich_infoで小数形式に正規化済み
+        payout = info.get("payoutRatio")
         if payout is not None:
             payout_pct = payout * 100
             if payout_pct < 40:
@@ -158,7 +158,7 @@ class BlackRockDividend:
                 score -= 2
                 reasons.append(f"高い配当性向 ({payout_pct:.0f}%) - 減配リスク")
 
-        de_ratio = info.get("debtToEquity")  # _enrich_infoで小数形式に正規化済み
+        de_ratio = info.get("debtToEquity")
         if de_ratio is not None:
             if de_ratio < 0.5:
                 score += 1
@@ -284,12 +284,12 @@ class BlackRockDividend:
         warnings = []
         is_trap = False
 
-        div_yield = info.get("dividendYield", 0)  # _enrich_infoで小数形式に正規化済み
+        div_yield = info.get("dividendYield", 0)
         if div_yield is not None and div_yield > 0.06:
             warnings.append("利回り6%超: 株価下落による見かけの高利回りの可能性")
             is_trap = True
 
-        payout = info.get("payoutRatio")  # _enrich_infoで小数形式に正規化済み
+        payout = info.get("payoutRatio")
         if payout is not None and payout > 0.9:
             warnings.append("配当性向90%超: 減配リスクが高い")
             is_trap = True

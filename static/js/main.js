@@ -206,6 +206,7 @@ async function onSearchInput(value) {
     suggestTimer = setTimeout(async () => {
         try {
             const res = await fetch(`/api/search?q=${encodeURIComponent(value)}`);
+            if (!res.ok) { hideSuggestions(); return; }
             const data = await res.json();
             if (data.results && data.results.length > 1) {
                 showSuggestions(data.results);
@@ -251,6 +252,7 @@ async function searchStock() {
 
     try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(input)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (data.results && data.results.length > 0) {
             const stock = data.results[0];
@@ -292,6 +294,7 @@ async function runAllAnalyses() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ticker: currentTicker, params: {} }),
         });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json();
         loading.classList.add('hidden');
@@ -364,7 +367,6 @@ function renderAllResults(allResults, analyzers, errors) {
 function switchTab(key) {
     document.querySelectorAll('.analysis-tab').forEach(tab => {
         if (tab.dataset.tab === key) {
-            tab.className = tab.className.replace(/bg-gs-darker\/60 text-gs-text-muted border-gs-border\/30 hover:border-gs-accent\/30 hover:text-white/g, '').trim();
             tab.classList.add('bg-gs-accent/20', 'text-gs-accent', 'border-gs-accent/40');
             tab.classList.remove('bg-gs-darker/60', 'text-gs-text-muted', 'border-gs-border/30');
         } else {
@@ -379,8 +381,8 @@ function switchTab(key) {
 
 // 分析実行
 async function runAnalysis(analyzerType) {
-    const needsTicker = document.querySelector(`[data-analyzer="${analyzerType}"]`)
-        .getAttribute('data-needs-ticker') === 'true';
+    const el = document.querySelector(`[data-analyzer="${analyzerType}"]`);
+    const needsTicker = el ? el.getAttribute('data-needs-ticker') === 'true' : true;
 
     if (needsTicker) {
         const input = document.getElementById('tickerInput').value.trim();
@@ -466,6 +468,7 @@ async function executeAnalysis(analyzerType, params) {
                 params: params,
             }),
         });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json();
 

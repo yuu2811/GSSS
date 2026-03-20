@@ -159,6 +159,11 @@ def _safe_serialize(obj):
         return obj
 
 
+@app.route("/api/health")
+def health():
+    return jsonify({"status": "ok"})
+
+
 @app.route("/")
 def index():
     return render_template("index.html", analyzers=ANALYZERS)

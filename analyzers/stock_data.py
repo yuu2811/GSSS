@@ -209,10 +209,13 @@ class StockDataFetcher:
         )
 
         # --- キャッシュフローの補完 ---
-        _set(info, "freeCashflow", _get(cashflow, "Free Cash Flow"))
-        if not info.get("operatingCashflow"):
+        if info.get("freeCashflow") is None:
+            fcf = _get(cashflow, "Free Cash Flow")
+            if fcf is not None:
+                info["freeCashflow"] = fcf
+        if info.get("operatingCashflow") is None:
             ocf = _get(cashflow, "Operating Cash Flow")
-            if ocf:
+            if ocf is not None:
                 info["operatingCashflow"] = ocf
 
         # --- 配当関連の補完 ---
@@ -245,8 +248,8 @@ class StockDataFetcher:
 
     @staticmethod
     def _set_if_missing(info: dict, key: str, value):
-        """infoにキーが無い場合のみ値を設定"""
-        if not info.get(key) and value:
+        """infoにキーが無い場合のみ値を設定（0もvalidな値として扱う）"""
+        if info.get(key) is None and value is not None:
             info[key] = value
 
     @staticmethod
@@ -353,7 +356,7 @@ class StockDataFetcher:
     @staticmethod
     def _enrich_ev_ebitda(info, financials, cashflow, operating_income):
         """EV/EBITDAの補完"""
-        if info.get("enterpriseToEbitda"):
+        if info.get("enterpriseToEbitda") is not None:
             return
 
         _get = StockDataFetcher._safe_get_latest

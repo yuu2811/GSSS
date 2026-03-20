@@ -91,7 +91,7 @@ class AcademicQuant:
         # Profitability (RMW)
         roe = info.get("returnOnEquity")
         if roe is not None:
-            roe_pct = roe * 100  # _enrich_infoで小数形式に正規化済み
+            roe_pct = roe * 100
             if roe_pct > 15:
                 score += 20
                 details.append(f"RMW: ROE {roe_pct:.1f}% — 高収益")
@@ -241,7 +241,7 @@ class AcademicQuant:
         # Profitability
         gp_margin = info.get("grossMargins")
         if gp_margin is not None:
-            gp_pct = gp_margin * 100  # yfinance値、通常は小数形式
+            gp_pct = gp_margin * 100
             if gp_pct > 40:
                 score += 20
                 details.append(f"粗利益率 {gp_pct:.1f}% — 高品質")
@@ -254,7 +254,7 @@ class AcademicQuant:
             sub_scores["粗利益率"] = f"{gp_pct:.1f}%"
 
         # Safety (leverage)
-        de_ratio = info.get("debtToEquity")  # _enrich_infoで小数形式に正規化済み
+        de_ratio = info.get("debtToEquity")
         if de_ratio is not None:
             if de_ratio < 0.3:
                 score += 25
@@ -273,7 +273,7 @@ class AcademicQuant:
         # Growth stability
         rev_growth = info.get("revenueGrowth")
         if rev_growth is not None:
-            rg = rev_growth * 100  # _enrich_infoで小数形式に正規化済み
+            rg = rev_growth * 100
             if rg > 10:
                 score += 20
                 details.append(f"売上成長 {rg:.1f}% — 安定成長")
@@ -286,7 +286,7 @@ class AcademicQuant:
             sub_scores["売上成長率"] = f"{rg:.1f}%"
 
         # Payout
-        payout = info.get("payoutRatio")  # _enrich_infoで小数形式に正規化済み
+        payout = info.get("payoutRatio")
         if payout is not None:
             po_pct = payout * 100
             if 20 < po_pct < 60:
@@ -303,7 +303,7 @@ class AcademicQuant:
         # ROA
         roa = info.get("returnOnAssets")
         if roa is not None:
-            roa_pct = roa * 100  # _enrich_infoで小数形式に正規化済み
+            roa_pct = roa * 100
             if roa_pct > 8:
                 score += 15
             elif roa_pct > 3:
@@ -355,7 +355,7 @@ class AcademicQuant:
 
         div_yield = info.get("dividendYield")
         if div_yield is not None:
-            dy = div_yield * 100  # _enrich_infoで小数形式に正規化済み
+            dy = div_yield * 100
             if dy > 4:
                 score += 25
                 details.append(f"配当利回り {dy:.2f}% — 高配当")
@@ -573,7 +573,7 @@ class AcademicQuant:
 
         eps_growth = info.get("earningsGrowth")
         if eps_growth is not None:
-            eg = eps_growth * 100  # _enrich_infoで小数形式に正規化済み
+            eg = eps_growth * 100
             if eg > 20:
                 score += 40
                 details.append(f"EPS成長率 {eg:+.1f}% — 強いポジティブサプライズ期待")
@@ -590,7 +590,7 @@ class AcademicQuant:
 
         rev_growth = info.get("revenueGrowth")
         if rev_growth is not None:
-            rg = rev_growth * 100  # _enrich_infoで小数形式に正規化済み
+            rg = rev_growth * 100
             if rg > 15:
                 score += 30
                 details.append(f"売上成長 {rg:+.1f}% — 好決算持続")

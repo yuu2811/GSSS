@@ -145,7 +145,7 @@ class GoldmanScreener:
 
     @staticmethod
     def _analyze_debt(info, balance_sheet):
-        de_ratio = info.get("debtToEquity")  # _enrich_infoで小数形式に正規化済み
+        de_ratio = info.get("debtToEquity")
         total_debt = info.get("totalDebt", 0)
         total_cash = info.get("totalCash", 0)
 
@@ -184,12 +184,12 @@ class GoldmanScreener:
         payout_ratio = info.get("payoutRatio")
 
         if div_yield is not None:
-            div_yield_pct = div_yield * 100  # _enrich_infoで小数形式に正規化済み
+            div_yield_pct = div_yield * 100
         else:
             div_yield_pct = 0
 
         if payout_ratio is not None:
-            payout_pct = payout_ratio * 100  # _enrich_infoで小数形式に正規化済み
+            payout_pct = payout_ratio * 100
             if payout_pct < 40:
                 sustainability = "非常に持続可能"
                 score = 10
