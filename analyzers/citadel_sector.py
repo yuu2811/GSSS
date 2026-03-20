@@ -1,7 +1,7 @@
 """Citadel スタイル セクターローテーション戦略"""
 
-import numpy as np
-import pandas as pd
+from __future__ import annotations
+
 import yfinance as yf
 
 
@@ -75,7 +75,7 @@ class CitadelSector:
                 # リターン計算
                 ret_1m = ((current / close.iloc[-22]) - 1) * 100 if len(close) >= 22 else None
                 ret_3m = ((current / close.iloc[-66]) - 1) * 100 if len(close) >= 66 else None
-                ret_6m = ((current / close.iloc[0]) - 1) * 100
+                ret_6m = ((current / close.iloc[0]) - 1) * 100 if close.iloc[0] != 0 else 0
 
                 results.append({
                     "sector": sector_name,
@@ -84,7 +84,7 @@ class CitadelSector:
                     "return_1m": round(ret_1m, 1) if ret_1m else None,
                     "return_3m": round(ret_3m, 1) if ret_3m else None,
                     "return_6m": round(ret_6m, 1),
-                    "momentum": "上昇" if (ret_1m and ret_1m > 0) else "下降",
+                    "momentum": "上昇" if (ret_1m is not None and ret_1m > 0) else ("下降" if ret_1m is not None else "データなし"),
                 })
             except Exception:
                 continue

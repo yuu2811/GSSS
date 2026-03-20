@@ -1,7 +1,10 @@
 """Academic Paper ベース 定量ファクター分析"""
 
+from __future__ import annotations
+
 import numpy as np
-import pandas as pd
+from .stock_data import StockDataFetcher, StockData, AnalysisResult
+from .scoring import weighted_composite
 
 
 class AcademicQuant:
@@ -11,11 +14,11 @@ class AcademicQuant:
     DESCRIPTION = "Fama-French、モメンタム、低ボラティリティ、QMJ等の学術論文ベースファクター分析"
 
     @staticmethod
-    def analyze(stock_data: dict) -> dict:
+    def analyze(stock_data: StockData) -> AnalysisResult:
         info = stock_data.get("info", {})
         history = stock_data.get("history")
         ticker = stock_data.get("ticker", "N/A")
-        company_name = info.get("longName", info.get("shortName", ticker))
+        company_name = StockDataFetcher.get_display_name(info, ticker)
 
         ff = AcademicQuant._fama_french(info, history)
         mom = AcademicQuant._momentum(info, history)
@@ -87,8 +90,8 @@ class AcademicQuant:
 
         # Profitability (RMW)
         roe = info.get("returnOnEquity")
-        if roe:
-            roe_pct = roe * 100 if abs(roe) < 1 else roe
+        if roe is not None:
+            roe_pct = roe * 100
             if roe_pct > 15:
                 score += 20
                 details.append(f"RMW: ROE {roe_pct:.1f}% — 高収益")
@@ -213,7 +216,6 @@ class AcademicQuant:
 
                 # Beta estimation
                 if len(returns) >= 120:
-                    mkt_ret = returns.mean() * 252
                     mkt_vol = returns.std() * np.sqrt(252)
                     beta_est = min(max(mkt_vol / 0.20, 0.3), 2.5)
                     if beta_est < 0.8:
@@ -238,8 +240,8 @@ class AcademicQuant:
 
         # Profitability
         gp_margin = info.get("grossMargins")
-        if gp_margin:
-            gp_pct = gp_margin * 100 if abs(gp_margin) < 1 else gp_margin
+        if gp_margin is not None:
+            gp_pct = gp_margin * 100
             if gp_pct > 40:
                 score += 20
                 details.append(f"粗利益率 {gp_pct:.1f}% — 高品質")
@@ -252,9 +254,8 @@ class AcademicQuant:
             sub_scores["粗利益率"] = f"{gp_pct:.1f}%"
 
         # Safety (leverage)
-        de = info.get("debtToEquity")
-        if de is not None:
-            de_ratio = de / 100 if de > 10 else de
+        de_ratio = info.get("debtToEquity")
+        if de_ratio is not None:
             if de_ratio < 0.3:
                 score += 25
                 details.append(f"D/E {de_ratio:.2f} — 安全（低レバレッジ）")
@@ -271,8 +272,8 @@ class AcademicQuant:
 
         # Growth stability
         rev_growth = info.get("revenueGrowth")
-        if rev_growth:
-            rg = rev_growth * 100 if abs(rev_growth) < 1 else rev_growth
+        if rev_growth is not None:
+            rg = rev_growth * 100
             if rg > 10:
                 score += 20
                 details.append(f"売上成長 {rg:.1f}% — 安定成長")
@@ -287,7 +288,7 @@ class AcademicQuant:
         # Payout
         payout = info.get("payoutRatio")
         if payout is not None:
-            po_pct = payout * 100 if abs(payout) < 2 else payout
+            po_pct = payout * 100
             if 20 < po_pct < 60:
                 score += 20
                 details.append(f"配当性向 {po_pct:.0f}% — 適正")
@@ -301,8 +302,8 @@ class AcademicQuant:
 
         # ROA
         roa = info.get("returnOnAssets")
-        if roa:
-            roa_pct = roa * 100 if abs(roa) < 1 else roa
+        if roa is not None:
+            roa_pct = roa * 100
             if roa_pct > 8:
                 score += 15
             elif roa_pct > 3:
@@ -353,8 +354,8 @@ class AcademicQuant:
             metrics["PBR"] = f"{pb:.2f}"
 
         div_yield = info.get("dividendYield")
-        if div_yield:
-            dy = div_yield * 100 if div_yield < 1 else div_yield
+        if div_yield is not None:
+            dy = div_yield * 100
             if dy > 4:
                 score += 25
                 details.append(f"配当利回り {dy:.2f}% — 高配当")
@@ -571,8 +572,8 @@ class AcademicQuant:
         metrics = {}
 
         eps_growth = info.get("earningsGrowth")
-        if eps_growth:
-            eg = eps_growth * 100 if abs(eps_growth) < 5 else eps_growth
+        if eps_growth is not None:
+            eg = eps_growth * 100
             if eg > 20:
                 score += 40
                 details.append(f"EPS成長率 {eg:+.1f}% — 強いポジティブサプライズ期待")
@@ -588,8 +589,8 @@ class AcademicQuant:
             metrics["EPS成長率"] = f"{eg:+.1f}%"
 
         rev_growth = info.get("revenueGrowth")
-        if rev_growth:
-            rg = rev_growth * 100 if abs(rev_growth) < 5 else rev_growth
+        if rev_growth is not None:
+            rg = rev_growth * 100
             if rg > 15:
                 score += 30
                 details.append(f"売上成長 {rg:+.1f}% — 好決算持続")
@@ -664,7 +665,7 @@ class AcademicQuant:
         # FCF margin
         fcf = info.get("freeCashflow")
         rev = info.get("totalRevenue")
-        if fcf and rev and rev > 0:
+        if fcf is not None and rev is not None and rev > 0:
             fcf_margin = fcf / rev * 100
             metrics["FCFマージン"] = f"{fcf_margin:.1f}%"
             if fcf_margin > 15:
@@ -775,29 +776,11 @@ class AcademicQuant:
             "リスクパリティ": rp["score"],
         }
 
-        total = sum(scores[k] * weights[k] for k in weights)
-
-        if total >= 70:
-            rating = "非常に魅力的"
-            rec = "強い買い推奨 — 複数ファクターが支持"
-        elif total >= 55:
-            rating = "魅力的"
-            rec = "買い推奨"
-        elif total >= 40:
-            rating = "中立"
-            rec = "保持/様子見"
-        elif total >= 25:
-            rating = "やや弱い"
-            rec = "慎重に検討"
-        else:
-            rating = "弱い"
-            rec = "見送り推奨"
-
-        return {
-            "total_score": round(total, 1),
-            "max_score": 100,
-            "factor_scores": scores,
-            "weights": {k: f"{v*100:.0f}%" for k, v in weights.items()},
-            "rating": rating,
-            "recommendation": rec,
-        }
+        thresholds = [
+            (70, "非常に魅力的", "強い買い推奨 — 複数ファクターが支持"),
+            (55, "魅力的", "買い推奨"),
+            (40, "中立", "保持/様子見"),
+            (25, "やや弱い", "慎重に検討"),
+            (0, "弱い", "見送り推奨"),
+        ]
+        return weighted_composite(scores, weights, thresholds)

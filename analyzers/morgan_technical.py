@@ -1,8 +1,8 @@
 """Morgan Stanley スタイル テクニカル分析"""
 
-import numpy as np
-import pandas as pd
-from .stock_data import StockDataFetcher
+from __future__ import annotations
+
+from .stock_data import StockDataFetcher, StockData, AnalysisResult
 
 
 class MorganTechnical:
@@ -12,11 +12,11 @@ class MorganTechnical:
     DESCRIPTION = "トレンド分析、移動平均、RSI、MACD、ボリンジャーバンドなど主要テクニカル指標を網羅"
 
     @staticmethod
-    def analyze(stock_data: dict) -> dict:
+    def analyze(stock_data: StockData) -> AnalysisResult:
         info = stock_data.get("info", {})
         history = stock_data.get("history")
         ticker = stock_data.get("ticker", "N/A")
-        company_name = info.get("longName", info.get("shortName", ticker))
+        company_name = StockDataFetcher.get_display_name(info, ticker)
 
         if history is None or history.empty:
             return {"analyzer": MorganTechnical.NAME, "error": "価格データが取得できません"}
@@ -101,7 +101,7 @@ class MorganTechnical:
 
         # ゴールデンクロス / デッドクロス判定
         crossover = None
-        if indicators.get("sma_50") and indicators.get("sma_200"):
+        if indicators.get("sma_50") is not None and indicators.get("sma_200") is not None:
             if indicators["sma_50"] > indicators["sma_200"]:
                 crossover = "ゴールデンクロス圏"
             else:

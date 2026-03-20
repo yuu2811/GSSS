@@ -1,7 +1,9 @@
 """Renaissance Technologies スタイル 定量スクリーニング"""
 
-import numpy as np
-import pandas as pd
+from __future__ import annotations
+
+from .stock_data import StockDataFetcher, StockData, AnalysisResult
+from .scoring import weighted_composite
 
 
 class RenaissanceQuant:
@@ -11,11 +13,11 @@ class RenaissanceQuant:
     DESCRIPTION = "バリュー、クオリティ、モメンタム、成長、センチメント各ファクターの複合スコア"
 
     @staticmethod
-    def analyze(stock_data: dict) -> dict:
+    def analyze(stock_data: StockData) -> AnalysisResult:
         info = stock_data.get("info", {})
         history = stock_data.get("history")
         ticker = stock_data.get("ticker", "N/A")
-        company_name = info.get("longName", info.get("shortName", ticker))
+        company_name = StockDataFetcher.get_display_name(info, ticker)
 
         # 各ファクタースコア計算
         value = RenaissanceQuant._value_factors(info)
@@ -100,8 +102,8 @@ class RenaissanceQuant:
         details = []
 
         roe = info.get("returnOnEquity")
-        if roe:
-            roe_pct = roe * 100 if roe < 1 else roe
+        if roe is not None:
+            roe_pct = roe * 100
             if roe_pct > 15:
                 score += 25
                 details.append(f"ROE {roe_pct:.1f}% （高い）")
@@ -113,8 +115,8 @@ class RenaissanceQuant:
                 details.append(f"ROE {roe_pct:.1f}% （低い）")
 
         margin = info.get("operatingMargins")
-        if margin:
-            margin_pct = margin * 100 if margin < 1 else margin
+        if margin is not None:
+            margin_pct = margin * 100
             if margin_pct > 20:
                 score += 25
                 details.append(f"営業利益率 {margin_pct:.1f}% （高い）")
@@ -125,9 +127,8 @@ class RenaissanceQuant:
                 score += 5
                 details.append(f"営業利益率 {margin_pct:.1f}%")
 
-        de = info.get("debtToEquity")
-        if de is not None:
-            de_ratio = de / 100 if de > 10 else de
+        de_ratio = info.get("debtToEquity")
+        if de_ratio is not None:
             if de_ratio < 0.5:
                 score += 25
                 details.append(f"D/E比率 {de_ratio:.2f} （低い）")
@@ -139,8 +140,8 @@ class RenaissanceQuant:
                 details.append(f"D/E比率 {de_ratio:.2f} （高い）")
 
         roa = info.get("returnOnAssets")
-        if roa:
-            roa_pct = roa * 100 if roa < 1 else roa
+        if roa is not None:
+            roa_pct = roa * 100
             if roa_pct > 10:
                 score += 25
                 details.append(f"ROA {roa_pct:.1f}% （高い）")
@@ -219,8 +220,8 @@ class RenaissanceQuant:
         details = []
 
         rev_growth = info.get("revenueGrowth")
-        if rev_growth:
-            rg_pct = rev_growth * 100 if rev_growth < 1 else rev_growth
+        if rev_growth is not None:
+            rg_pct = rev_growth * 100
             if rg_pct > 15:
                 score += 30
                 details.append(f"売上成長率 {rg_pct:.1f}% （高成長）")
@@ -235,8 +236,8 @@ class RenaissanceQuant:
                 details.append(f"売上成長率 {rg_pct:.1f}% （減収）")
 
         eps_growth = info.get("earningsGrowth")
-        if eps_growth:
-            eg_pct = eps_growth * 100 if eps_growth < 1 else eps_growth
+        if eps_growth is not None:
+            eg_pct = eps_growth * 100
             if eg_pct > 20:
                 score += 35
                 details.append(f"EPS成長率 {eg_pct:.1f}% （高成長）")
@@ -250,8 +251,8 @@ class RenaissanceQuant:
                 details.append(f"EPS成長率 {eg_pct:.1f}% （減益）")
 
         margin_trend = info.get("operatingMargins")
-        if margin_trend:
-            m_pct = margin_trend * 100 if margin_trend < 1 else margin_trend
+        if margin_trend is not None:
+            m_pct = margin_trend * 100
             if m_pct > 15:
                 score += 20
                 details.append(f"営業利益率 {m_pct:.1f}% （高マージン）")
@@ -294,7 +295,7 @@ class RenaissanceQuant:
 
         # 機関投資家保有
         inst = info.get("heldPercentInstitutions")
-        if inst:
+        if inst is not None:
             inst_pct = inst * 100 if inst < 1 else inst
             if inst_pct > 70:
                 score += 30
@@ -308,7 +309,7 @@ class RenaissanceQuant:
 
         # ショートインタレスト
         short_pct = info.get("shortPercentOfFloat")
-        if short_pct:
+        if short_pct is not None:
             sp = short_pct * 100 if short_pct < 1 else short_pct
             if sp < 3:
                 score += 20
@@ -322,7 +323,7 @@ class RenaissanceQuant:
 
         # インサイダー保有
         insider = info.get("heldPercentInsiders")
-        if insider:
+        if insider is not None:
             ins_pct = insider * 100 if insider < 1 else insider
             if ins_pct > 10:
                 score += 15
@@ -350,29 +351,11 @@ class RenaissanceQuant:
             "センチメント": sentiment["score"],
         }
 
-        composite = sum(scores[k] * weights[k] for k in weights)
-
-        if composite >= 75:
-            rating = "非常に魅力的"
-            recommendation = "強い買い推奨"
-        elif composite >= 60:
-            rating = "魅力的"
-            recommendation = "買い推奨"
-        elif composite >= 45:
-            rating = "中立"
-            recommendation = "保持/様子見"
-        elif composite >= 30:
-            rating = "やや弱い"
-            recommendation = "慎重に検討"
-        else:
-            rating = "弱い"
-            recommendation = "見送り推奨"
-
-        return {
-            "total_score": round(composite, 1),
-            "max_score": 100,
-            "factor_scores": scores,
-            "weights": {k: f"{v*100:.0f}%" for k, v in weights.items()},
-            "rating": rating,
-            "recommendation": recommendation,
-        }
+        thresholds = [
+            (75, "非常に魅力的", "強い買い推奨"),
+            (60, "魅力的", "買い推奨"),
+            (45, "中立", "保持/様子見"),
+            (30, "やや弱い", "慎重に検討"),
+            (0, "弱い", "見送り推奨"),
+        ]
+        return weighted_composite(scores, weights, thresholds)

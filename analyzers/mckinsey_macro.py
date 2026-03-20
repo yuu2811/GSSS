@@ -1,7 +1,7 @@
 """McKinsey スタイル マクロ経済影響レポート"""
 
-import numpy as np
-import pandas as pd
+from __future__ import annotations
+
 import yfinance as yf
 
 

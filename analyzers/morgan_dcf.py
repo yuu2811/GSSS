@@ -1,7 +1,34 @@
 """Morgan Stanley スタイル DCFバリュエーション"""
 
-import numpy as np
-import pandas as pd
+from __future__ import annotations
+
+from .stock_data import StockDataFetcher, StockData, AnalysisResult
+
+# ── WACC パラメータ ──
+RISK_FREE_RATE = 0.01          # 日本10年国債（約1%）
+EQUITY_RISK_PREMIUM = 0.06     # 株式リスクプレミアム
+COST_OF_DEBT = 0.015           # 日本企業の平均借入金利
+DEFAULT_DEBT_EQUITY = 0.3      # D/Eデフォルト
+TAX_RATE = 0.30                # 実効税率
+
+# ── 成長率 ──
+DEFAULT_REVENUE_GROWTH = 0.05  # デフォルト売上成長率
+GROWTH_DECAY_FACTOR = 0.1      # 毎年の成長率逓減率
+MIN_GROWTH_RATE = 0.02         # 最低成長率
+TERMINAL_GROWTH_RATE = 0.015   # 永続成長率
+
+# ── FCF ──
+DEFAULT_FCF_MARGIN = 0.08      # デフォルトFCFマージン
+MIN_FCF_MARGIN = 0.03          # 最低FCFマージン
+OP_MARGIN_TO_FCF = 0.7         # 営業利益率→FCFマージン変換係数
+
+# ── バリュエーション ──
+EV_EBITDA_MULTIPLE = 10        # 標準的なEV/EBITDA出口倍率
+TV_FALLBACK_MULTIPLE = 20      # WACC≤永続成長率時のフォールバック倍率
+
+# ── 感度分析 ──
+SENSITIVITY_WACC_STEP = 0.01
+SENSITIVITY_GROWTH_RANGE = [0.005, 0.010, 0.015, 0.020, 0.025]
 
 
 class MorganDCF:
@@ -11,15 +38,15 @@ class MorganDCF:
     DESCRIPTION = "5年間の収益予測、WACC推定、ターミナルバリュー、感度分析"
 
     @staticmethod
-    def analyze(stock_data: dict) -> dict:
+    def analyze(stock_data: StockData) -> AnalysisResult:
         info = stock_data.get("info", {})
         financials = stock_data.get("financials")
         cashflow = stock_data.get("cashflow")
         balance_sheet = stock_data.get("balance_sheet")
         ticker = stock_data.get("ticker", "N/A")
-        company_name = info.get("longName", info.get("shortName", ticker))
+        company_name = StockDataFetcher.get_display_name(info, ticker)
 
-        current_price = info.get("currentPrice") or info.get("regularMarketPrice", 0)
+        current_price = StockDataFetcher.get_current_price(info)
         shares_outstanding = info.get("sharesOutstanding", 0)
         market_cap = info.get("marketCap", 0)
 
@@ -49,7 +76,7 @@ class MorganDCF:
         )
 
         # 判定
-        verdict = MorganDCF._verdict(valuation, current_price)
+        verdict = MorganDCF._verdict(valuation, current_price, wacc)
 
         return {
             "analyzer": MorganDCF.NAME,
@@ -93,20 +120,20 @@ class MorganDCF:
 
         # 成長率の推定
         rev_growth = info.get("revenueGrowth")
-        if rev_growth:
-            base_growth = rev_growth if rev_growth < 1 else rev_growth / 100
+        if rev_growth is not None:
+            base_growth = rev_growth
         elif len(rev_hist) >= 2:
             latest = rev_hist[-1]["value"]
             prev = rev_hist[-2]["value"]
-            base_growth = (latest / prev - 1) if prev > 0 else 0.05
+            base_growth = (latest / prev - 1) if prev > 0 else DEFAULT_REVENUE_GROWTH
         else:
-            base_growth = 0.05
+            base_growth = DEFAULT_REVENUE_GROWTH
 
         # 成長率の逓減（保守的）
         growth_rates = []
         for i in range(5):
-            rate = base_growth * (1 - i * 0.1)  # 毎年10%ずつ成長率低下
-            rate = max(rate, 0.02)  # 最低2%
+            rate = base_growth * (1 - i * GROWTH_DECAY_FACTOR)
+            rate = max(rate, MIN_GROWTH_RATE)
             growth_rates.append(rate)
 
         # 直近の売上高
@@ -143,16 +170,15 @@ class MorganDCF:
         if fcf_hist and rev_hist and len(fcf_hist) > 0 and len(rev_hist) > 0:
             latest_fcf = fcf_hist[-1]["value"]
             latest_rev = rev_hist[-1]["value"]
-            fcf_margin = latest_fcf / latest_rev if latest_rev > 0 else 0.08
+            fcf_margin = latest_fcf / latest_rev if latest_rev > 0 else DEFAULT_FCF_MARGIN
         else:
-            # デフォルトのFCFマージン
             op_margin = info.get("operatingMargins", 0.10)
-            if op_margin and op_margin < 1:
-                fcf_margin = op_margin * 0.7  # 営業利益率の70%をFCFマージンと推定
+            if op_margin is not None and op_margin < 1:
+                fcf_margin = op_margin * OP_MARGIN_TO_FCF
             else:
-                fcf_margin = 0.08
+                fcf_margin = DEFAULT_FCF_MARGIN
 
-        fcf_margin = max(fcf_margin, 0.03)  # 最低3%
+        fcf_margin = max(fcf_margin, MIN_FCF_MARGIN)
 
         yearly = projections.get("yearly", [])
         fcf_projections = []
@@ -174,33 +200,25 @@ class MorganDCF:
     def _estimate_wacc(info):
         beta = info.get("beta", 1.0) or 1.0
 
-        risk_free_rate = 0.01  # 日本10年国債（約1%）
-        market_premium = 0.06  # 株式リスクプレミアム
-        cost_of_equity = risk_free_rate + beta * market_premium
+        cost_of_equity = RISK_FREE_RATE + beta * EQUITY_RISK_PREMIUM
 
         de_ratio = info.get("debtToEquity")
-        if de_ratio:
-            de = de_ratio / 100 if de_ratio > 10 else de_ratio
-        else:
-            de = 0.3
-
-        cost_of_debt = 0.015  # 日本企業の平均借入金利
-        tax_rate = 0.30  # 実効税率
+        de = de_ratio if de_ratio is not None else DEFAULT_DEBT_EQUITY
 
         equity_weight = 1 / (1 + de)
         debt_weight = de / (1 + de)
 
-        wacc = equity_weight * cost_of_equity + debt_weight * cost_of_debt * (1 - tax_rate)
+        wacc = equity_weight * cost_of_equity + debt_weight * COST_OF_DEBT * (1 - TAX_RATE)
 
         return {
             "wacc_pct": round(wacc * 100, 2),
             "cost_of_equity_pct": round(cost_of_equity * 100, 2),
-            "cost_of_debt_pct": round(cost_of_debt * 100, 2),
+            "cost_of_debt_pct": round(COST_OF_DEBT * 100, 2),
             "beta": round(beta, 2),
-            "risk_free_rate_pct": round(risk_free_rate * 100, 2),
-            "equity_risk_premium_pct": round(market_premium * 100, 2),
+            "risk_free_rate_pct": round(RISK_FREE_RATE * 100, 2),
+            "equity_risk_premium_pct": round(EQUITY_RISK_PREMIUM * 100, 2),
             "debt_equity_ratio": round(de, 2),
-            "tax_rate_pct": round(tax_rate * 100, 0),
+            "tax_rate_pct": round(TAX_RATE * 100, 0),
         }
 
     @staticmethod
@@ -213,26 +231,24 @@ class MorganDCF:
         wacc_rate = wacc["wacc_pct"] / 100
 
         # 永続成長法
-        terminal_growth = 0.015  # 1.5%永続成長
-        if wacc_rate > terminal_growth:
-            tv_perpetuity = last_fcf * (1 + terminal_growth) / (wacc_rate - terminal_growth)
+        if wacc_rate > TERMINAL_GROWTH_RATE:
+            tv_perpetuity = last_fcf * (1 + TERMINAL_GROWTH_RATE) / (wacc_rate - TERMINAL_GROWTH_RATE)
         else:
-            tv_perpetuity = last_fcf * 20
+            tv_perpetuity = last_fcf * TV_FALLBACK_MULTIPLE
 
-        # マルチプル法
-        ev_ebitda_multiple = 10  # 標準的なEV/EBITDA倍率
-        tv_multiple = last_fcf * ev_ebitda_multiple / 0.7  # FCFからEBITDAを逆算（概算）
+        # マルチプル法（FCFからEBITDAを逆算）
+        tv_multiple = last_fcf * EV_EBITDA_MULTIPLE / OP_MARGIN_TO_FCF
 
         return {
             "perpetuity_growth": {
                 "terminal_value": round(tv_perpetuity, 0),
-                "growth_rate_pct": round(terminal_growth * 100, 1),
+                "growth_rate_pct": round(TERMINAL_GROWTH_RATE * 100, 1),
                 "method": "永続成長モデル (Gordon Growth Model)",
             },
             "exit_multiple": {
                 "terminal_value": round(tv_multiple, 0),
-                "multiple": ev_ebitda_multiple,
-                "method": f"EV/EBITDA {ev_ebitda_multiple}x出口マルチプル",
+                "multiple": EV_EBITDA_MULTIPLE,
+                "method": f"EV/EBITDA {EV_EBITDA_MULTIPLE}x出口マルチプル",
             },
         }
 
@@ -294,8 +310,8 @@ class MorganDCF:
         yearly = fcf_projections.get("yearly", [])
         net_debt = (info.get("totalDebt", 0) or 0) - (info.get("totalCash", 0) or 0)
 
-        wacc_range = [base_wacc - 0.02, base_wacc - 0.01, base_wacc, base_wacc + 0.01, base_wacc + 0.02]
-        growth_range = [0.005, 0.010, 0.015, 0.020, 0.025]
+        wacc_range = [base_wacc + i * SENSITIVITY_WACC_STEP for i in range(-2, 3)]
+        growth_range = SENSITIVITY_GROWTH_RANGE
 
         table = []
         for w in wacc_range:
@@ -312,7 +328,7 @@ class MorganDCF:
                     pv_tv = tv / ((1 + w) ** len(yearly))
                     ev = total_pv + pv_tv
                 else:
-                    ev = total_pv + (yearly[-1]["fcf"] * 20 if yearly else 0)
+                    ev = total_pv + (yearly[-1]["fcf"] * TV_FALLBACK_MULTIPLE if yearly else 0)
 
                 equity = ev - net_debt
                 per_share = equity / shares if shares > 0 else 0
@@ -328,7 +344,7 @@ class MorganDCF:
         }
 
     @staticmethod
-    def _verdict(valuation, current_price):
+    def _verdict(valuation, current_price, wacc):
         fair_value = valuation.get("per_share_average", 0)
 
         if not current_price or not fair_value:
@@ -359,7 +375,7 @@ class MorganDCF:
             "current_price": round(current_price, 0),
             "upside_pct": round(upside, 1),
             "key_assumptions": [
-                f"WACC: {valuation.get('total_pv_fcf', 0)}に基づく割引",
+                f"WACC: {wacc.get('wacc_pct', 0):.1f}%に基づく割引",
                 "成長率は逓減モデル（保守的）",
                 "ターミナルバリューは永続成長法とマルチプル法の平均",
             ],

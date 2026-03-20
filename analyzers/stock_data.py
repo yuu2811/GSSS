@@ -1,15 +1,47 @@
 """株価データ取得モジュール - yfinanceを使用して日本株データを取得"""
 
+from __future__ import annotations
+
 import yfinance as yf
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+from typing import Any
 
 from .stock_names import search_stocks, get_name_by_code
+
+# 型エイリアス — アナライザー間で共通利用
+StockData = dict[str, Any]  # fetch() の戻り値型
+AnalysisResult = dict[str, Any]  # analyze() の戻り値型
+SearchResult = dict[str, str]  # {"ticker": ..., "name": ..., "code": ...}
 
 
 class StockDataFetcher:
     """日本株のデータを取得・整形するクラス"""
+
+    # ── 共通ヘルパーメソッド ──────────────────────────────
+
+    @staticmethod
+    def get_display_name(info: dict, ticker: str = "N/A") -> str:
+        """info辞書から表示用会社名を取得"""
+        return info.get("longName") or info.get("shortName") or ticker
+
+    @staticmethod
+    def get_current_price(info: dict) -> float:
+        """info辞書から現在価格を取得"""
+        return info.get("currentPrice") or info.get("regularMarketPrice") or 0
+
+    @staticmethod
+    def normalize_percent(value, threshold: float = 10) -> float | None:
+        """比率を小数形式(0.x)に正規化する。
+        yfinanceのD/E比率、配当性向等は値域が不定（小数 or パーセント）のため統一する。
+        threshold以上の値はパーセント値とみなして100で割る。
+        """
+        if value is None:
+            return None
+        if abs(value) >= threshold:
+            return value / 100
+        return value
 
     # 主要な日本株セクターETF
     SECTOR_ETFS = {
@@ -43,7 +75,7 @@ class StockDataFetcher:
         return code
 
     @staticmethod
-    def search_by_name(query: str) -> list:
+    def search_by_name(query: str) -> list[SearchResult]:
         """銘柄名またはコードで検索し、候補リストを返す
 
         Args:
@@ -84,13 +116,12 @@ class StockDataFetcher:
         return []
 
     @staticmethod
-    def fetch(ticker: str, period: str = "5y") -> dict:
+    def fetch(ticker: str, period: str = "5y") -> StockData:
         """指定銘柄の包括的なデータを取得"""
         ticker = StockDataFetcher.normalize_ticker(ticker)
         stock = yf.Ticker(ticker)
 
-        result = {
-            "ticker": ticker,
+        defaults = {
             "info": {},
             "history": pd.DataFrame(),
             "financials": pd.DataFrame(),
@@ -99,46 +130,39 @@ class StockDataFetcher:
             "dividends": pd.Series(dtype=float),
             "earnings_dates": pd.DataFrame(),
         }
+        result = {"ticker": ticker, **defaults}
 
-        try:
-            result["info"] = stock.info or {}
-        except Exception:
-            result["info"] = {}
+        fetchers = {
+            "info": lambda: stock.info or {},
+            "history": lambda: stock.history(period=period),
+            "financials": lambda: stock.financials,
+            "balance_sheet": lambda: stock.balance_sheet,
+            "cashflow": lambda: stock.cashflow,
+            "dividends": lambda: stock.dividends,
+            "earnings_dates": lambda: stock.earnings_dates,
+        }
 
-        try:
-            result["history"] = stock.history(period=period)
-        except Exception:
-            pass
-
-        try:
-            result["financials"] = stock.financials
-        except Exception:
-            pass
-
-        try:
-            result["balance_sheet"] = stock.balance_sheet
-        except Exception:
-            pass
-
-        try:
-            result["cashflow"] = stock.cashflow
-        except Exception:
-            pass
-
-        try:
-            result["dividends"] = stock.dividends
-        except Exception:
-            pass
-
-        try:
-            result["earnings_dates"] = stock.earnings_dates
-        except Exception:
-            pass
+        for key, fetcher in fetchers.items():
+            try:
+                result[key] = fetcher()
+            except Exception:
+                pass  # defaults から既に設定済み
 
         # 不足データを財務諸表から補完
         StockDataFetcher._enrich_info(result)
 
         return result
+
+    @staticmethod
+    def _safe_get_latest(df, row_name):
+        """DataFrameから最新の値を安全に取得"""
+        if df is None or df.empty:
+            return None
+        if row_name in df.index:
+            vals = df.loc[row_name].dropna()
+            if not vals.empty:
+                return float(vals.iloc[0])  # 最新（列が新しい順）
+        return None
 
     @staticmethod
     def _enrich_info(data: dict):
@@ -150,188 +174,62 @@ class StockDataFetcher:
         history = data.get("history")
         dividends = data.get("dividends")
 
-        # --- 現在価格の補完 ---
-        if not info.get("currentPrice") and not info.get("regularMarketPrice"):
-            if history is not None and not history.empty:
-                info["currentPrice"] = float(history["Close"].iloc[-1])
+        _get = StockDataFetcher._safe_get_latest
+
+        # --- 基本情報の補完 ---
+        StockDataFetcher._enrich_basic_info(info, history, data.get("ticker", ""))
 
         current_price = info.get("currentPrice") or info.get("regularMarketPrice", 0)
-
-        # --- 会社名の補完 (ローカルDB) ---
-        if not info.get("longName") and not info.get("shortName"):
-            ticker = data.get("ticker", "")
-            local_name = get_name_by_code(ticker.replace(".T", ""))
-            if local_name:
-                info["longName"] = local_name
-
-        # --- 52週高値/安値の補完 ---
-        if history is not None and not history.empty:
-            close = history["Close"]
-            if len(close) >= 252:
-                recent_year = close.iloc[-252:]
-            else:
-                recent_year = close
-
-            if not info.get("fiftyTwoWeekHigh"):
-                info["fiftyTwoWeekHigh"] = float(recent_year.max())
-            if not info.get("fiftyTwoWeekLow"):
-                info["fiftyTwoWeekLow"] = float(recent_year.min())
-
-        # --- 財務諸表からの指標計算 ---
-        def _safe_get_latest(df, row_name):
-            """DataFrameから最新の値を安全に取得"""
-            if df is None or df.empty:
-                return None
-            if row_name in df.index:
-                vals = df.loc[row_name].dropna()
-                if not vals.empty:
-                    return float(vals.iloc[0])  # 最新（列が新しい順）
-            return None
-
-        # 売上高
-        if not info.get("totalRevenue"):
-            rev = _safe_get_latest(financials, "Total Revenue")
-            if rev:
-                info["totalRevenue"] = rev
-
-        # 営業利益
-        operating_income = _safe_get_latest(financials, "Operating Income")
-
-        # 純利益
-        net_income = _safe_get_latest(financials, "Net Income")
-
-        # 総資産
-        total_assets = _safe_get_latest(balance_sheet, "Total Assets")
-
-        # 総負債
-        total_debt_bs = (
-            _safe_get_latest(balance_sheet, "Total Debt")
-            or _safe_get_latest(balance_sheet, "Long Term Debt")
-        )
-        if not info.get("totalDebt") and total_debt_bs:
-            info["totalDebt"] = total_debt_bs
-
-        # 現金同等物
-        total_cash_bs = (
-            _safe_get_latest(balance_sheet, "Cash And Cash Equivalents")
-            or _safe_get_latest(balance_sheet, "Cash Cash Equivalents And Short Term Investments")
-        )
-        if not info.get("totalCash") and total_cash_bs:
-            info["totalCash"] = total_cash_bs
-
-        # 株主資本
-        total_equity = (
-            _safe_get_latest(balance_sheet, "Stockholders Equity")
-            or _safe_get_latest(balance_sheet, "Total Equity Gross Minority Interest")
-            or _safe_get_latest(balance_sheet, "Common Stock Equity")
-        )
-
-        # --- ROE (Return on Equity) ---
-        if not info.get("returnOnEquity") and net_income and total_equity and total_equity != 0:
-            info["returnOnEquity"] = net_income / total_equity
-
-        # --- ROA (Return on Assets) ---
-        if not info.get("returnOnAssets") and net_income and total_assets and total_assets != 0:
-            info["returnOnAssets"] = net_income / total_assets
-
-        # --- 営業利益率 ---
-        total_revenue = info.get("totalRevenue") or _safe_get_latest(financials, "Total Revenue")
-        if not info.get("operatingMargins") and operating_income and total_revenue and total_revenue != 0:
-            info["operatingMargins"] = operating_income / total_revenue
-
-        # --- 純利益率 ---
-        if not info.get("profitMargins") and net_income and total_revenue and total_revenue != 0:
-            info["profitMargins"] = net_income / total_revenue
-
-        # --- D/E比率 ---
-        if not info.get("debtToEquity"):
-            total_debt_val = info.get("totalDebt") or total_debt_bs
-            if total_debt_val and total_equity and total_equity != 0:
-                info["debtToEquity"] = (total_debt_val / total_equity) * 100
-
-        # --- PER (株価収益率) ---
         shares_outstanding = info.get("sharesOutstanding", 0)
-        if not info.get("trailingPE") and net_income and current_price and shares_outstanding:
-            eps = net_income / shares_outstanding
-            if eps > 0:
-                info["trailingPE"] = current_price / eps
 
-        # --- PBR (株価純資産倍率) ---
-        if not info.get("priceToBook") and total_equity and current_price and shares_outstanding:
-            bps = total_equity / shares_outstanding
-            if bps > 0:
-                info["priceToBook"] = current_price / bps
+        # --- 財務諸表から基礎数値を抽出 ---
+        operating_income = _get(financials, "Operating Income")
+        net_income = _get(financials, "Net Income")
+        total_assets = _get(balance_sheet, "Total Assets")
+        total_equity = (
+            _get(balance_sheet, "Stockholders Equity")
+            or _get(balance_sheet, "Total Equity Gross Minority Interest")
+            or _get(balance_sheet, "Common Stock Equity")
+        )
+        total_debt_bs = _get(balance_sheet, "Total Debt") or _get(balance_sheet, "Long Term Debt")
+        total_revenue = info.get("totalRevenue") or _get(financials, "Total Revenue")
 
-        # --- 時価総額 ---
-        if not info.get("marketCap") and current_price and shares_outstanding:
-            info["marketCap"] = current_price * shares_outstanding
+        # --- 欠損データの補完 ---
+        _set = StockDataFetcher._set_if_missing
+        _set(info, "totalRevenue", _get(financials, "Total Revenue"))
+        _set(info, "totalDebt", total_debt_bs)
+        _set(info, "totalCash",
+             _get(balance_sheet, "Cash And Cash Equivalents")
+             or _get(balance_sheet, "Cash Cash Equivalents And Short Term Investments"))
 
-        # --- フリーキャッシュフロー ---
-        if not info.get("freeCashflow"):
-            fcf = _safe_get_latest(cashflow, "Free Cash Flow")
-            if fcf:
+        # --- 財務比率の補完 ---
+        StockDataFetcher._enrich_ratios(
+            info, net_income, total_equity, total_assets, operating_income,
+            total_revenue, total_debt_bs, current_price, shares_outstanding,
+        )
+
+        # --- キャッシュフローの補完 ---
+        if info.get("freeCashflow") is None:
+            fcf = _get(cashflow, "Free Cash Flow")
+            if fcf is not None:
                 info["freeCashflow"] = fcf
-
-        # --- 営業キャッシュフロー ---
-        if not info.get("operatingCashflow"):
-            ocf = _safe_get_latest(cashflow, "Operating Cash Flow")
-            if ocf:
+        if info.get("operatingCashflow") is None:
+            ocf = _get(cashflow, "Operating Cash Flow")
+            if ocf is not None:
                 info["operatingCashflow"] = ocf
 
-        # --- 配当利回りの補完 ---
-        if not info.get("dividendYield") and dividends is not None and not dividends.empty and current_price:
-            # 直近1年間の配当合計
-            one_year_ago = datetime.now() - timedelta(days=365)
-            try:
-                recent_divs = dividends[dividends.index >= one_year_ago]
-                if not recent_divs.empty:
-                    annual_div = float(recent_divs.sum())
-                    if annual_div > 0 and current_price > 0:
-                        info["dividendYield"] = annual_div / current_price
-                        if not info.get("dividendRate"):
-                            info["dividendRate"] = annual_div
-            except Exception:
-                pass
+        # --- 配当関連の補完 ---
+        StockDataFetcher._enrich_dividends(info, dividends, current_price, net_income, shares_outstanding)
 
-        # --- EPS ---
-        if not info.get("trailingEps") and net_income and shares_outstanding:
-            info["trailingEps"] = net_income / shares_outstanding
-
-        # --- 売上成長率の補完 ---
-        if not info.get("revenueGrowth") and financials is not None and not financials.empty:
-            if "Total Revenue" in financials.index:
-                revs = financials.loc["Total Revenue"].dropna()
-                if len(revs) >= 2:
-                    latest = float(revs.iloc[0])
-                    prev = float(revs.iloc[1])
-                    if prev > 0:
-                        info["revenueGrowth"] = (latest - prev) / prev
-
-        # --- EPS成長率の補完 ---
-        if not info.get("earningsGrowth") and financials is not None and not financials.empty:
-            if "Net Income" in financials.index:
-                ni = financials.loc["Net Income"].dropna()
-                if len(ni) >= 2:
-                    latest_ni = float(ni.iloc[0])
-                    prev_ni = float(ni.iloc[1])
-                    if prev_ni > 0:
-                        info["earningsGrowth"] = (latest_ni - prev_ni) / prev_ni
+        # --- 成長率の補完 ---
+        StockDataFetcher._enrich_growth_rates(info, financials)
 
         # --- EV/EBITDA の補完 ---
-        if not info.get("enterpriseToEbitda"):
-            ebitda = _safe_get_latest(financials, "EBITDA")
-            if not ebitda:
-                # EBITDA = Operating Income + Depreciation
-                depreciation = _safe_get_latest(cashflow, "Depreciation And Amortization")
-                if operating_income and depreciation:
-                    ebitda = operating_income + abs(depreciation)
-            if ebitda and ebitda > 0:
-                market_cap = info.get("marketCap", 0)
-                total_debt_val = info.get("totalDebt", 0) or 0
-                total_cash_val = info.get("totalCash", 0) or 0
-                if market_cap:
-                    ev = market_cap + total_debt_val - total_cash_val
-                    info["enterpriseToEbitda"] = ev / ebitda
+        StockDataFetcher._enrich_ev_ebitda(info, financials, cashflow, operating_income)
+
+        # --- 配当性向の正規化（小数形式で統一）---
+        if info.get("payoutRatio") is not None:
+            info["payoutRatio"] = StockDataFetcher.normalize_percent(info["payoutRatio"], threshold=2)
 
         # --- 配当性向の補完 ---
         if not info.get("payoutRatio") and dividends is not None and not dividends.empty and net_income and shares_outstanding:
@@ -347,6 +245,134 @@ class StockDataFetcher:
                 pass
 
         data["info"] = info
+
+    @staticmethod
+    def _set_if_missing(info: dict, key: str, value):
+        """infoにキーが無い場合のみ値を設定（0もvalidな値として扱う）"""
+        if info.get(key) is None and value is not None:
+            info[key] = value
+
+    @staticmethod
+    def _enrich_basic_info(info: dict, history, ticker: str):
+        """現在価格・会社名・52週高値安値を補完"""
+        if not info.get("currentPrice") and not info.get("regularMarketPrice"):
+            if history is not None and not history.empty:
+                info["currentPrice"] = float(history["Close"].iloc[-1])
+
+        if not info.get("longName") and not info.get("shortName"):
+            local_name = get_name_by_code(ticker.replace(".T", ""))
+            if local_name:
+                info["longName"] = local_name
+
+        if history is not None and not history.empty:
+            close = history["Close"]
+            recent_year = close.iloc[-252:] if len(close) >= 252 else close
+            if not info.get("fiftyTwoWeekHigh"):
+                info["fiftyTwoWeekHigh"] = float(recent_year.max())
+            if not info.get("fiftyTwoWeekLow"):
+                info["fiftyTwoWeekLow"] = float(recent_year.min())
+
+    @staticmethod
+    def _enrich_ratios(info, net_income, total_equity, total_assets,
+                       operating_income, total_revenue, total_debt_bs,
+                       current_price, shares_outstanding):
+        """ROE, ROA, 利益率, D/E, PER, PBR, 時価総額, EPSを補完"""
+        if not info.get("returnOnEquity") and net_income and total_equity and total_equity != 0:
+            info["returnOnEquity"] = net_income / total_equity
+
+        if not info.get("returnOnAssets") and net_income and total_assets and total_assets != 0:
+            info["returnOnAssets"] = net_income / total_assets
+
+        if not info.get("operatingMargins") and operating_income and total_revenue and total_revenue != 0:
+            info["operatingMargins"] = operating_income / total_revenue
+
+        if not info.get("profitMargins") and net_income and total_revenue and total_revenue != 0:
+            info["profitMargins"] = net_income / total_revenue
+
+        # D/E比率（小数形式で統一）
+        if info.get("debtToEquity") is not None:
+            info["debtToEquity"] = StockDataFetcher.normalize_percent(info["debtToEquity"])
+        else:
+            total_debt_val = info.get("totalDebt") or total_debt_bs
+            if total_debt_val and total_equity and total_equity != 0:
+                info["debtToEquity"] = total_debt_val / total_equity
+
+        # PER
+        if not info.get("trailingPE") and net_income and current_price and shares_outstanding:
+            eps = net_income / shares_outstanding
+            if eps > 0:
+                info["trailingPE"] = current_price / eps
+
+        # PBR
+        if not info.get("priceToBook") and total_equity and current_price and shares_outstanding:
+            bps = total_equity / shares_outstanding
+            if bps > 0:
+                info["priceToBook"] = current_price / bps
+
+        # 時価総額
+        if not info.get("marketCap") and current_price and shares_outstanding:
+            info["marketCap"] = current_price * shares_outstanding
+
+        # EPS
+        if not info.get("trailingEps") and net_income and shares_outstanding:
+            info["trailingEps"] = net_income / shares_outstanding
+
+    @staticmethod
+    def _enrich_dividends(info, dividends, current_price, net_income, shares_outstanding):
+        """配当利回りの補完"""
+        if not info.get("dividendYield") and dividends is not None and not dividends.empty and current_price:
+            one_year_ago = datetime.now() - timedelta(days=365)
+            try:
+                recent_divs = dividends[dividends.index >= one_year_ago]
+                if not recent_divs.empty:
+                    annual_div = float(recent_divs.sum())
+                    if annual_div > 0 and current_price > 0:
+                        info["dividendYield"] = annual_div / current_price
+                        if not info.get("dividendRate"):
+                            info["dividendRate"] = annual_div
+            except Exception:
+                pass
+
+    @staticmethod
+    def _enrich_growth_rates(info, financials):
+        """売上成長率・EPS成長率の補完"""
+        if financials is None or financials.empty:
+            return
+
+        if not info.get("revenueGrowth") and "Total Revenue" in financials.index:
+            revs = financials.loc["Total Revenue"].dropna()
+            if len(revs) >= 2:
+                latest, prev = float(revs.iloc[0]), float(revs.iloc[1])
+                if prev > 0:
+                    info["revenueGrowth"] = (latest - prev) / prev
+
+        if not info.get("earningsGrowth") and "Net Income" in financials.index:
+            ni = financials.loc["Net Income"].dropna()
+            if len(ni) >= 2:
+                latest_ni, prev_ni = float(ni.iloc[0]), float(ni.iloc[1])
+                if prev_ni > 0:
+                    info["earningsGrowth"] = (latest_ni - prev_ni) / prev_ni
+
+    @staticmethod
+    def _enrich_ev_ebitda(info, financials, cashflow, operating_income):
+        """EV/EBITDAの補完"""
+        if info.get("enterpriseToEbitda") is not None:
+            return
+
+        _get = StockDataFetcher._safe_get_latest
+        ebitda = _get(financials, "EBITDA")
+        if not ebitda:
+            depreciation = _get(cashflow, "Depreciation And Amortization")
+            if operating_income and depreciation:
+                ebitda = operating_income + abs(depreciation)
+
+        if ebitda and ebitda > 0:
+            market_cap = info.get("marketCap", 0)
+            if market_cap:
+                total_debt_val = info.get("totalDebt", 0) or 0
+                total_cash_val = info.get("totalCash", 0) or 0
+                ev = market_cap + total_debt_val - total_cash_val
+                info["enterpriseToEbitda"] = ev / ebitda
 
     @staticmethod
     def fetch_price_history(ticker: str, period: str = "1y") -> pd.DataFrame:
@@ -428,7 +454,10 @@ class StockDataFetcher:
         indicators["bb_upper"] = (sma20 + 2 * std20).iloc[-1]
         indicators["bb_middle"] = sma20.iloc[-1]
         indicators["bb_lower"] = (sma20 - 2 * std20).iloc[-1]
-        bb_width = ((indicators["bb_upper"] - indicators["bb_lower"]) / indicators["bb_middle"]) * 100
+        if indicators["bb_middle"] and indicators["bb_middle"] != 0:
+            bb_width = ((indicators["bb_upper"] - indicators["bb_lower"]) / indicators["bb_middle"]) * 100
+        else:
+            bb_width = 0
         indicators["bb_width"] = bb_width
 
         # 現在価格

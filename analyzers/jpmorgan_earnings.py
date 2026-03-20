@@ -1,7 +1,9 @@
 """JPMorgan Chase スタイル 決算分析"""
 
-import numpy as np
+from __future__ import annotations
+
 import pandas as pd
+from .stock_data import StockDataFetcher, StockData, AnalysisResult
 
 
 class JPMorganEarnings:
@@ -11,15 +13,15 @@ class JPMorganEarnings:
     DESCRIPTION = "決算履歴、コンセンサス予想、オプションインプライドムーブ、ポジション戦略"
 
     @staticmethod
-    def analyze(stock_data: dict) -> dict:
+    def analyze(stock_data: StockData) -> AnalysisResult:
         info = stock_data.get("info", {})
         history = stock_data.get("history")
         earnings_dates = stock_data.get("earnings_dates")
         financials = stock_data.get("financials")
         ticker = stock_data.get("ticker", "N/A")
-        company_name = info.get("longName", info.get("shortName", ticker))
+        company_name = StockDataFetcher.get_display_name(info, ticker)
 
-        current_price = info.get("currentPrice") or info.get("regularMarketPrice", 0)
+        current_price = StockDataFetcher.get_current_price(info)
 
         # 決算履歴分析
         earnings_history = JPMorganEarnings._earnings_history(earnings_dates)
@@ -115,11 +117,11 @@ class JPMorganEarnings:
     @staticmethod
     def _key_metrics(info, financials):
         metrics = [
-            {"name": "売上高成長率", "value": f"{info.get('revenueGrowth', 0)*100:.1f}%" if info.get('revenueGrowth') else "N/A", "importance": "高"},
-            {"name": "営業利益率", "value": f"{info.get('operatingMargins', 0)*100:.1f}%" if info.get('operatingMargins') else "N/A", "importance": "高"},
-            {"name": "純利益率", "value": f"{info.get('profitMargins', 0)*100:.1f}%" if info.get('profitMargins') else "N/A", "importance": "高"},
-            {"name": "ROE", "value": f"{info.get('returnOnEquity', 0)*100:.1f}%" if info.get('returnOnEquity') else "N/A", "importance": "中"},
-            {"name": "フリーキャッシュフロー", "value": f"¥{info.get('freeCashflow', 0):,.0f}" if info.get('freeCashflow') else "N/A", "importance": "高"},
+            {"name": "売上高成長率", "value": f"{info.get('revenueGrowth', 0)*100:.1f}%" if info.get('revenueGrowth') is not None else "N/A", "importance": "高"},
+            {"name": "営業利益率", "value": f"{info.get('operatingMargins', 0)*100:.1f}%" if info.get('operatingMargins') is not None else "N/A", "importance": "高"},
+            {"name": "純利益率", "value": f"{info.get('profitMargins', 0)*100:.1f}%" if info.get('profitMargins') is not None else "N/A", "importance": "高"},
+            {"name": "ROE", "value": f"{info.get('returnOnEquity', 0)*100:.1f}%" if info.get('returnOnEquity') is not None else "N/A", "importance": "中"},
+            {"name": "フリーキャッシュフロー", "value": f"¥{info.get('freeCashflow', 0):,.0f}" if info.get('freeCashflow') is not None else "N/A", "importance": "高"},
         ]
         return metrics
 
@@ -158,8 +160,8 @@ class JPMorganEarnings:
 
     @staticmethod
     def _positioning_strategy(earnings_history, implied_move, current_price):
-        beat_rate = earnings_history.get("beat_rate", 50)
-        est_move = implied_move.get("estimated_move_pct", 5)
+        beat_rate = earnings_history.get("beat_rate") or 50
+        est_move = implied_move.get("estimated_move_pct") or 5.0
 
         strategies = []
 
