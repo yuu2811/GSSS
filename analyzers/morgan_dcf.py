@@ -48,7 +48,7 @@ class MorganDCF:
         )
 
         # 判定
-        verdict = MorganDCF._verdict(valuation, current_price)
+        verdict = MorganDCF._verdict(valuation, current_price, wacc)
 
         return {
             "analyzer": MorganDCF.NAME,
@@ -324,7 +324,7 @@ class MorganDCF:
         }
 
     @staticmethod
-    def _verdict(valuation, current_price):
+    def _verdict(valuation, current_price, wacc):
         fair_value = valuation.get("per_share_average", 0)
 
         if not current_price or not fair_value:
@@ -355,7 +355,7 @@ class MorganDCF:
             "current_price": round(current_price, 0),
             "upside_pct": round(upside, 1),
             "key_assumptions": [
-                f"WACC: {valuation.get('total_pv_fcf', 0)}に基づく割引",
+                f"WACC: {wacc.get('wacc_pct', 0):.1f}%に基づく割引",
                 "成長率は逓減モデル（保守的）",
                 "ターミナルバリューは永続成長法とマルチプル法の平均",
             ],

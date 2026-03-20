@@ -458,7 +458,10 @@ class StockDataFetcher:
         indicators["bb_upper"] = (sma20 + 2 * std20).iloc[-1]
         indicators["bb_middle"] = sma20.iloc[-1]
         indicators["bb_lower"] = (sma20 - 2 * std20).iloc[-1]
-        bb_width = ((indicators["bb_upper"] - indicators["bb_lower"]) / indicators["bb_middle"]) * 100
+        if indicators["bb_middle"] and indicators["bb_middle"] != 0:
+            bb_width = ((indicators["bb_upper"] - indicators["bb_lower"]) / indicators["bb_middle"]) * 100
+        else:
+            bb_width = 0
         indicators["bb_width"] = bb_width
 
         # 現在価格

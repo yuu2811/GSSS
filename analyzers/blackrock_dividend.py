@@ -182,8 +182,8 @@ class BlackRockDividend:
 
     @staticmethod
     def _income_projection(info, investment_amount, growth_analysis):
-        div_yield = info.get("dividendYield") or 0
-        div_yield_pct = div_yield if div_yield < 1 else div_yield / 100
+        div_yield = info.get("dividendYield") or 0  # _enrich_infoで小数形式に正規化済み
+        div_yield_pct = div_yield
 
         cagr = growth_analysis.get("cagr_pct", 3)
         growth_rate = cagr / 100
@@ -213,8 +213,8 @@ class BlackRockDividend:
         if not current_price or current_price == 0:
             return {"note": "現在価格が取得できません"}
 
-        div_yield = info.get("dividendYield") or 0
-        div_yield_pct = div_yield if div_yield < 1 else div_yield / 100
+        div_yield = info.get("dividendYield") or 0  # _enrich_infoで小数形式に正規化済み
+        div_yield_pct = div_yield
 
         price_growth = 0.05  # 年間5%の株価成長を想定
         div_growth = growth_analysis.get("cagr_pct", 3) / 100

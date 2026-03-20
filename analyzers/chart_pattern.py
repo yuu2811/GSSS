@@ -79,7 +79,7 @@ class ChartPattern:
                     peaks.append((i, vals[i]))
             if len(peaks) >= 2:
                 p1, p2 = peaks[-2], peaks[-1]
-                if abs(p1[1] - p2[1]) / p1[1] < 0.03 and p2[0] - p1[0] >= 10:
+                if p1[1] > 0 and abs(p1[1] - p2[1]) / p1[1] < 0.03 and p2[0] - p1[0] >= 10:
                     neckline = float(low.tail(60).iloc[p1[0]:p2[0]].min())
                     target = neckline - (p1[1] - neckline)
                     patterns.append({
@@ -100,7 +100,7 @@ class ChartPattern:
                     troughs.append((i, vals[i]))
             if len(troughs) >= 2:
                 t1, t2 = troughs[-2], troughs[-1]
-                if abs(t1[1] - t2[1]) / t1[1] < 0.03 and t2[0] - t1[0] >= 10:
+                if t1[1] > 0 and abs(t1[1] - t2[1]) / t1[1] < 0.03 and t2[0] - t1[0] >= 10:
                     neckline = float(high.tail(60).iloc[t1[0]:t2[0]].max())
                     target = neckline + (neckline - t1[1])
                     patterns.append({
@@ -123,7 +123,7 @@ class ChartPattern:
                 for j in range(len(peaks) - 2):
                     left, head, right = peaks[j], peaks[j+1], peaks[j+2]
                     if head[1] > left[1] and head[1] > right[1]:
-                        if abs(left[1] - right[1]) / left[1] < 0.05:
+                        if left[1] > 0 and abs(left[1] - right[1]) / left[1] < 0.05:
                             neckline = float(low.tail(90).iloc[left[0]:right[0]].min())
                             target = neckline - (head[1] - neckline)
                             patterns.append({
@@ -452,7 +452,7 @@ class ChartPattern:
             prices.sort()
             clusters = [[prices[0]]]
             for p in prices[1:]:
-                if (p - clusters[-1][-1]) / clusters[-1][-1] < threshold:
+                if clusters[-1][-1] > 0 and (p - clusters[-1][-1]) / clusters[-1][-1] < threshold:
                     clusters[-1].append(p)
                 else:
                     clusters.append([p])
