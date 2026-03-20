@@ -35,12 +35,12 @@
                     <label class="block text-xs sm:text-sm text-gs-text-muted mb-1.5">銘柄コード / 銘柄名</label>
                     <input type="text" id="tickerInput"
                         class="input-glow w-full bg-gs-darker border border-gs-border rounded-xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-white placeholder-gs-text-muted/50 focus:border-gs-accent focus:outline-none text-base transition-all duration-200"
-                        placeholder="例: 7203, トヨタ, ソニー, SONY, ソフトバンク"
+                        placeholder="銘柄コードまたは銘柄名を入力 → Enter で全分析実行"
                         autocomplete="off">
                 </div>
                 <div>
                     <button onclick="searchStock()" class="btn-primary text-white px-5 sm:px-7 py-2.5 sm:py-3 rounded-xl font-medium whitespace-nowrap text-sm sm:text-base">
-                        銘柄確認
+                        全分析実行
                     </button>
                 </div>
             </div>
@@ -62,13 +62,15 @@
         </div>
     </section>
 
-    <!-- Analysis Menu -->
+    <!-- Analysis Menu (collapsed by default) -->
     <section class="mb-6 sm:mb-12">
-        <div class="flex items-center gap-2 mb-4 sm:mb-5">
+        <button onclick="document.getElementById('analyzerGrid').classList.toggle('hidden'); this.querySelector('.toggle-arrow').classList.toggle('rotate-90')" class="flex items-center gap-2 mb-4 sm:mb-5 group cursor-pointer">
             <div class="w-1 h-5 bg-gs-accent rounded-full"></div>
-            <h2 class="text-white font-semibold text-base sm:text-lg">分析メニュー</h2>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+            <h2 class="text-white font-semibold text-base sm:text-lg group-hover:text-gs-accent transition-colors">個別分析メニュー</h2>
+            <span class="toggle-arrow text-gs-text-muted text-xs transition-transform duration-200">&#9654;</span>
+            <span class="text-gs-text-muted/50 text-xs ml-1">（個別に実行したい場合）</span>
+        </button>
+        <div id="analyzerGrid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             {% for key, analyzer in analyzers.items() %}
             <div class="analyzer-card bg-gs-card rounded-2xl p-4 sm:p-5 cursor-pointer"
                  onclick="runAnalysis('{{ key }}')"

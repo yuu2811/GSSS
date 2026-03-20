@@ -188,7 +188,8 @@ function selectSuggestion(code, name) {
     document.getElementById('stockTicker').textContent = `(${currentTicker})`;
     document.getElementById('stockInfo').classList.remove('hidden');
     addToHistory(currentTicker, name);
-    showStatus('データ取得完了', 'success');
+    // 自動的に全分析実行
+    runAllAnalyses();
 }
 
 async function onSearchInput(value) {
@@ -243,7 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupKeyboardShortcuts();
 });
 
-// 銘柄検索
+// 銘柄検索 → 全分析一括実行
 async function searchStock() {
     const input = document.getElementById('tickerInput').value.trim();
     if (!input) return;
@@ -258,7 +259,8 @@ async function searchStock() {
             document.getElementById('stockTicker').textContent = `(${stock.ticker})`;
             document.getElementById('stockInfo').classList.remove('hidden');
             addToHistory(stock.ticker, stock.name);
-            showStatus('データ取得完了', 'success');
+            // 自動的に全分析実行
+            runAllAnalyses();
         } else {
             showStatus('銘柄が見つかりませんでした', 'warning');
         }
@@ -266,6 +268,113 @@ async function searchStock() {
         console.error('検索エラー:', e);
         showStatus('銘柄検索に失敗しました', 'error');
     }
+}
+
+// 全分析一括実行
+async function runAllAnalyses() {
+    if (!currentTicker) {
+        showStatus('銘柄コードを入力してください', 'error');
+        return;
+    }
+
+    const loading = document.getElementById('loading');
+    const results = document.getElementById('results');
+    const loadingText = document.getElementById('loadingText');
+
+    loading.classList.remove('hidden');
+    showSkeletonLoader();
+    loadingText.textContent = '全分析を一括実行中...';
+    loading.scrollIntoView({ behavior: 'smooth' });
+
+    try {
+        const res = await fetch('/api/analyze_all', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticker: currentTicker, params: {} }),
+        });
+
+        const data = await res.json();
+        loading.classList.add('hidden');
+
+        if (data.error) {
+            results.innerHTML = renderError(data.error);
+            results.classList.remove('hidden');
+            return;
+        }
+
+        results.innerHTML = renderAllResults(data.results, data.analyzers, data.errors);
+        results.classList.remove('hidden');
+        results.scrollIntoView({ behavior: 'smooth' });
+
+        const count = Object.keys(data.results).length;
+        showStatus(`${count}件の分析が完了しました`, 'success');
+
+    } catch (e) {
+        loading.classList.add('hidden');
+        results.innerHTML = renderError('通信エラーが発生しました: ' + e.message);
+        results.classList.remove('hidden');
+        showStatus('分析中にエラーが発生しました', 'error');
+    }
+}
+
+// 全結果をタブ表示
+function renderAllResults(allResults, analyzers, errors) {
+    const keys = Object.keys(allResults);
+    if (keys.length === 0) return renderError('分析結果がありません');
+
+    // タブ順序
+    const tabOrder = [
+        'goldman', 'morgan_technical', 'chart_pattern', 'bridgewater',
+        'jpmorgan', 'blackrock', 'renaissance', 'academic_quant',
+        'morgan_dcf', 'citadel', 'vanguard', 'mckinsey'
+    ];
+    const orderedKeys = tabOrder.filter(k => keys.includes(k));
+
+    let tabsHtml = '<div class="flex flex-wrap gap-1.5 sm:gap-2 mb-6 border-b border-gs-border/40 pb-4">';
+    orderedKeys.forEach((key, i) => {
+        const info = analyzers[key] || {};
+        const active = i === 0 ? 'bg-gs-accent/20 text-gs-accent border-gs-accent/40' : 'bg-gs-darker/60 text-gs-text-muted border-gs-border/30 hover:border-gs-accent/30 hover:text-white';
+        tabsHtml += `<button class="analysis-tab px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium border transition-all duration-200 ${active}" data-tab="${key}" onclick="switchTab('${key}')">
+            <span class="mr-1">${info.icon || ''}</span>${escapeHtml(info.short || key)}
+        </button>`;
+    });
+    tabsHtml += '</div>';
+
+    let panelsHtml = '';
+    orderedKeys.forEach((key, i) => {
+        const info = analyzers[key] || {};
+        const hidden = i === 0 ? '' : 'hidden';
+        const content = renderAnalysis(key, allResults[key], info);
+        panelsHtml += `<div class="analysis-panel ${hidden}" data-panel="${key}">${content}</div>`;
+    });
+
+    // エラー表示
+    let errHtml = '';
+    const errKeys = Object.keys(errors || {});
+    if (errKeys.length > 0) {
+        errHtml = `<div class="mt-4 bg-red-900/10 border border-red-700/20 rounded-xl p-3 text-xs text-red-400/70">
+            <span class="font-semibold">一部エラー:</span> ${errKeys.map(k => `${analyzers[k]?.short || k}: ${escapeHtml(errors[k])}`).join(' / ')}
+        </div>`;
+    }
+
+    return tabsHtml + panelsHtml + errHtml;
+}
+
+// タブ切替
+function switchTab(key) {
+    document.querySelectorAll('.analysis-tab').forEach(tab => {
+        if (tab.dataset.tab === key) {
+            tab.className = tab.className.replace(/bg-gs-darker\/60 text-gs-text-muted border-gs-border\/30 hover:border-gs-accent\/30 hover:text-white/g, '').trim();
+            tab.classList.add('bg-gs-accent/20', 'text-gs-accent', 'border-gs-accent/40');
+            tab.classList.remove('bg-gs-darker/60', 'text-gs-text-muted', 'border-gs-border/30');
+        } else {
+            tab.classList.remove('bg-gs-accent/20', 'text-gs-accent', 'border-gs-accent/40');
+            tab.classList.add('bg-gs-darker/60', 'text-gs-text-muted', 'border-gs-border/30');
+        }
+    });
+    document.querySelectorAll('.analysis-panel').forEach(panel => {
+        panel.classList.toggle('hidden', panel.dataset.panel !== key);
+    });
 }
 
 // 分析実行
