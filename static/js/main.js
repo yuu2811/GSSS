@@ -208,10 +208,14 @@ async function onSearchInput(value) {
             const res = await fetch(`/api/search?q=${encodeURIComponent(value)}`);
             if (!res.ok) { hideSuggestions(); return; }
             const data = await res.json();
-            if (data.results && data.results.length > 1) {
-                showSuggestions(data.results);
-            } else if (data.results && data.results.length === 1 && !/^\d+$/.test(value)) {
-                // 名前検索で1件のみの場合もサジェスト表示
+            if (data.results && data.results.length > 0) {
+                // 数字4桁で1件だけマッチ → 自動選択して全分析実行
+                if (/^\d{4,}$/.test(value) && data.results.length === 1) {
+                    const r = data.results[0];
+                    const code = (r.code || r.ticker || '').replace('.T', '');
+                    selectSuggestion(code, r.name);
+                    return;
+                }
                 showSuggestions(data.results);
             } else {
                 hideSuggestions();
