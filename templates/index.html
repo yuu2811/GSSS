@@ -62,53 +62,6 @@
         </div>
     </section>
 
-    <!-- Analysis Menu (collapsed by default) -->
-    <section class="mb-6 sm:mb-12">
-        <button onclick="document.getElementById('analyzerGrid').classList.toggle('hidden'); this.querySelector('.toggle-arrow').classList.toggle('rotate-90')" class="flex items-center gap-2 mb-4 sm:mb-5 group cursor-pointer">
-            <div class="w-1 h-5 bg-gs-accent rounded-full"></div>
-            <h2 class="text-white font-semibold text-base sm:text-lg group-hover:text-gs-accent transition-colors">個別分析メニュー</h2>
-            <span class="toggle-arrow text-gs-text-muted text-xs transition-transform duration-200">&#9654;</span>
-            <span class="text-gs-text-muted/50 text-xs ml-1">（個別に実行したい場合）</span>
-        </button>
-        <div id="analyzerGrid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-            {% for key, analyzer in analyzers.items() %}
-            <div class="analyzer-card bg-gs-card rounded-2xl p-4 sm:p-5 cursor-pointer"
-                 onclick="runAnalysis('{{ key }}')"
-                 data-analyzer="{{ key }}"
-                 data-needs-ticker="{{ 'true' if analyzer.needs_ticker else 'false' }}">
-                <div class="flex items-start gap-3">
-                    <div class="text-2xl flex-shrink-0 mt-0.5">{{ analyzer.icon }}</div>
-                    <div class="flex-1">
-                        <h3 class="text-white font-semibold text-sm mb-1 tracking-tight">{{ analyzer.short }}</h3>
-                        <p class="text-gs-text-muted text-xs leading-relaxed">{{ analyzer.description }}</p>
-                    </div>
-                </div>
-                {% if not analyzer.needs_ticker %}
-                <div class="mt-3">
-                    <span class="badge-no-ticker text-[10px] text-gs-accent px-2.5 py-1 rounded-md font-medium inline-block">銘柄コード不要</span>
-                </div>
-                {% endif %}
-            </div>
-            {% endfor %}
-        </div>
-    </section>
-
-    <!-- Parameters -->
-    <div id="paramsSection" class="mb-6 sm:mb-10 hidden">
-        <div class="card-elevated rounded-2xl p-4 sm:p-7">
-            <div class="flex items-center gap-2 mb-4 sm:mb-5">
-                <div class="w-1 h-5 bg-gs-gold rounded-full"></div>
-                <h3 class="text-white font-semibold text-sm sm:text-base" id="paramsTitle">追加パラメータ</h3>
-            </div>
-            <div id="paramsContent" class="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4"></div>
-            <div class="mt-5">
-                <button onclick="submitWithParams()" class="btn-gold w-full sm:w-auto text-gs-darker px-7 py-2.5 sm:py-3 rounded-xl font-semibold text-base">
-                    分析開始
-                </button>
-            </div>
-        </div>
-    </div>
-
     <!-- Loading -->
     <div id="loading" class="hidden text-center py-16 sm:py-24">
         <div class="loader mx-auto mb-5"></div>
