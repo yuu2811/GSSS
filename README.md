@@ -116,20 +116,11 @@ docs/
 
 ## 使い方
 
-### 1. 銘柄を指定して分析する場合
+1. 画面上部の入力欄に **銘柄コード**（例: `7203`）または **銘柄名**（例: `トヨタ`）を入力
+2. **Enter** または **「全分析実行」** ボタンをクリック
+3. **全12種類の分析が自動で一括実行**され、タブ形式で結果が表示されます
 
-1. 画面上部の入力欄に **銘柄コード**（例: `7203`）または **銘柄コード.T**（例: `7203.T`）を入力
-2. **「銘柄確認」** ボタンをクリック（会社名が表示されます）
-3. 実行したい分析カードをクリック
-4. 分析結果が画面下部に表示されます
-
-### 2. 銘柄不要の分析を実行する場合
-
-以下の3つの分析は銘柄入力なしで実行できます:
-
-- **Citadel セクターローテーション** — 日本株セクター全体の分析
-- **Vanguard ETFポートフォリオ** — パラメータ（年齢・投資金額・リスク許容度）入力後に実行
-- **McKinsey マクロ経済レポート** — 現在のマクロ環境の分析
+> 分析の種類を個別に選ぶ必要はありません。銘柄を入力するだけで全分析が横断的に実行されます。
 
 ### 代表的な銘柄コード例
 
@@ -203,54 +194,27 @@ GSSS/
 
 ## API リファレンス
 
-### `POST /api/analyze`
+### `POST /api/analyze_all`（メイン）
 
-分析を実行します。
+指定銘柄に対して全12種類の分析を一括実行します。UIはこのエンドポイントを使用します。
 
 **リクエストボディ（JSON）:**
 
 ```json
 {
-  "analyzer": "goldman",
   "ticker": "7203",
   "params": {}
 }
 ```
-
-| パラメータ | 型 | 説明 |
-|------------|------|------|
-| `analyzer` | string | 分析タイプ（後述の一覧参照） |
-| `ticker` | string | 銘柄コード（例: `7203`, `7203.T`）。銘柄不要の分析では空文字 |
-| `params` | object | 追加パラメータ（分析タイプにより異なる） |
-
-**分析タイプ一覧:**
-
-| analyzer 値 | 分析名 | 追加パラメータ |
-|-------------|--------|---------------|
-| `goldman` | Goldman Sachs スクリーナー | なし |
-| `morgan_technical` | Morgan Stanley テクニカル | なし |
-| `bridgewater` | Bridgewater リスク評価 | なし |
-| `jpmorgan` | JPMorgan 決算分析 | なし |
-| `blackrock` | BlackRock 配当分析 | `investment_amount` (数値) |
-| `citadel` | Citadel セクターローテーション | なし |
-| `renaissance` | Renaissance 定量スクリーナー | なし |
-| `vanguard` | Vanguard ETFポートフォリオ | `age` (数値), `investment_amount` (数値), `risk_profile` (文字列) |
-| `mckinsey` | McKinsey マクロ経済 | なし |
-| `morgan_dcf` | Morgan Stanley DCF | なし |
-| `academic_quant` | Academic Paper 定量分析 | なし |
-| `chart_pattern` | チャートパターン分析 | なし |
 
 **レスポンス例:**
 
 ```json
 {
   "success": true,
-  "data": { ... },
-  "analyzer_info": {
-    "name": "Goldman Sachs 株式スクリーナー",
-    "icon": "📊",
-    "description": "..."
-  }
+  "results": { "goldman": { ... }, "morgan_technical": { ... }, ... },
+  "errors": {},
+  "analyzers": { ... }
 }
 ```
 
@@ -260,19 +224,6 @@ GSSS/
 
 ```json
 { "status": "ok" }
-```
-
-### `POST /api/analyze_all`
-
-指定銘柄に対して全12種類の分析を一括実行します。
-
-**リクエストボディ（JSON）:**
-
-```json
-{
-  "ticker": "7203",
-  "params": {}
-}
 ```
 
 ### `GET /api/search?q={query}`
