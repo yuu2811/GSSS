@@ -5,7 +5,6 @@
  */
 
 let currentTicker = '';
-let currentAnalyzer = '';
 let statusTimer = null;
 const HISTORY_KEY = 'gsss_search_history';
 const MAX_HISTORY = 8;
@@ -208,10 +207,14 @@ async function onSearchInput(value) {
             const res = await fetch(`/api/search?q=${encodeURIComponent(value)}`);
             if (!res.ok) { hideSuggestions(); return; }
             const data = await res.json();
-            if (data.results && data.results.length > 1) {
-                showSuggestions(data.results);
-            } else if (data.results && data.results.length === 1 && !/^\d+$/.test(value)) {
-                // 名前検索で1件のみの場合もサジェスト表示
+            if (data.results && data.results.length > 0) {
+                // 数字4桁で1件だけマッチ → 自動選択して全分析実行
+                if (/^\d{4,}$/.test(value) && data.results.length === 1) {
+                    const r = data.results[0];
+                    const code = (r.code || r.ticker || '').replace('.T', '');
+                    selectSuggestion(code, r.name);
+                    return;
+                }
                 showSuggestions(data.results);
             } else {
                 hideSuggestions();
@@ -379,119 +382,6 @@ function switchTab(key) {
     });
 }
 
-// 分析実行
-async function runAnalysis(analyzerType) {
-    const el = document.querySelector(`[data-analyzer="${analyzerType}"]`);
-    const needsTicker = el ? el.getAttribute('data-needs-ticker') === 'true' : true;
-
-    if (needsTicker) {
-        const input = document.getElementById('tickerInput').value.trim();
-        if (!input && !currentTicker) {
-            showStatus('銘柄コードを入力してください', 'error');
-            document.getElementById('tickerInput').focus();
-            return;
-        }
-        if (!currentTicker) {
-            currentTicker = input.endsWith('.T') ? input : (input.match(/^\d+$/) ? input + '.T' : input);
-        }
-    }
-
-    if (analyzerType === 'blackrock' || analyzerType === 'vanguard') {
-        showParamsForm(analyzerType);
-        return;
-    }
-
-    currentAnalyzer = analyzerType;
-    await executeAnalysis(analyzerType, {});
-}
-
-// パラメータフォーム表示
-function showParamsForm(analyzerType) {
-    currentAnalyzer = analyzerType;
-    const section = document.getElementById('paramsSection');
-    const content = document.getElementById('paramsContent');
-    const title = document.getElementById('paramsTitle');
-
-    section.classList.remove('hidden');
-
-    const inputClass = 'input-glow w-full bg-gs-darker border border-gs-border rounded-xl px-4 py-3 text-white focus:border-gs-accent focus:outline-none text-base transition-all duration-200';
-
-    if (analyzerType === 'blackrock') {
-        title.textContent = 'BlackRock 配当分析 - パラメータ設定';
-        content.innerHTML = `<div><label class="block text-sm text-gs-text-muted mb-1.5">投資金額（円）</label><input type="number" id="param_investment_amount" value="1000000" class="${inputClass}"></div>`;
-    } else if (analyzerType === 'vanguard') {
-        title.textContent = 'Vanguard ETFポートフォリオ - パラメータ設定';
-        content.innerHTML = `
-            <div><label class="block text-sm text-gs-text-muted mb-1.5">年齢</label><input type="number" id="param_age" value="35" class="${inputClass}"></div>
-            <div><label class="block text-sm text-gs-text-muted mb-1.5">投資金額（円）</label><input type="number" id="param_investment_amount" value="1000000" class="${inputClass}"></div>
-            <div><label class="block text-sm text-gs-text-muted mb-1.5">リスクプロファイル</label><select id="param_risk_profile" class="${inputClass}"><option value="積極型">積極型</option><option value="やや積極型">やや積極型</option><option value="バランス型" selected>バランス型</option><option value="やや保守型">やや保守型</option><option value="保守型">保守型</option></select></div>`;
-    }
-
-    section.scrollIntoView({ behavior: 'smooth' });
-}
-
-// パラメータ付き実行
-async function submitWithParams() {
-    const params = {};
-
-    if (currentAnalyzer === 'blackrock') {
-        params.investment_amount = document.getElementById('param_investment_amount').value;
-    } else if (currentAnalyzer === 'vanguard') {
-        params.age = document.getElementById('param_age').value;
-        params.investment_amount = document.getElementById('param_investment_amount').value;
-        params.risk_profile = document.getElementById('param_risk_profile').value;
-    }
-
-    document.getElementById('paramsSection').classList.add('hidden');
-    await executeAnalysis(currentAnalyzer, params);
-}
-
-// 分析API呼び出し
-async function executeAnalysis(analyzerType, params) {
-    const loading = document.getElementById('loading');
-    const results = document.getElementById('results');
-    const loadingText = document.getElementById('loadingText');
-
-    loading.classList.remove('hidden');
-    showSkeletonLoader();
-    loadingText.textContent = '分析データを取得中...';
-
-    loading.scrollIntoView({ behavior: 'smooth' });
-
-    try {
-        const res = await fetch('/api/analyze', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                analyzer: analyzerType,
-                ticker: currentTicker,
-                params: params,
-            }),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-        const data = await res.json();
-
-        loading.classList.add('hidden');
-
-        if (data.error) {
-            results.innerHTML = renderError(data.error);
-            results.classList.remove('hidden');
-            return;
-        }
-
-        results.innerHTML = renderAnalysis(analyzerType, data.data, data.analyzer_info);
-        results.classList.remove('hidden');
-        results.scrollIntoView({ behavior: 'smooth' });
-        showStatus('分析完了', 'success');
-
-    } catch (e) {
-        loading.classList.add('hidden');
-        results.innerHTML = renderError('通信エラーが発生しました: ' + e.message);
-        results.classList.remove('hidden');
-        showStatus('分析中にエラーが発生しました', 'error');
-    }
-}
 
 // エラー表示
 function renderError(message) {
