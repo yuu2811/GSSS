@@ -284,8 +284,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // クリック外でサジェストを閉じる
+    // クリック外でサジェストを閉じる + 動的ボタンイベント委譲
     document.addEventListener('click', (e) => {
+        // 動的生成ボタン
+        if (e.target.closest('.reload-btn')) { location.reload(); return; }
+        const tabBtn = e.target.closest('.analysis-tab');
+        if (tabBtn && tabBtn.dataset.tab) { switchTab(tabBtn.dataset.tab); return; }
+        // サジェスト外クリック
         if (!e.target.closest('#tickerInput') && !e.target.closest('#suggestionsContainer')) {
             hideSuggestions();
         }
@@ -386,7 +391,7 @@ function renderAllResults(allResults, analyzers, errors) {
     orderedKeys.forEach((key, i) => {
         const info = analyzers[key] || {};
         const active = i === 0 ? 'bg-gs-accent/20 text-gs-accent border-gs-accent/40' : 'bg-gs-darker/60 text-gs-text-muted border-gs-border/30 hover:border-gs-accent/30 hover:text-white';
-        tabsHtml += `<button class="analysis-tab px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium border transition-all duration-200 ${active}" data-tab="${key}" onclick="switchTab('${key}')">
+        tabsHtml += `<button class="analysis-tab px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium border transition-all duration-200 ${active}" data-tab="${key}">
             <span class="mr-1">${info.icon || ''}</span>${escapeHtml(info.short || key)}
         </button>`;
     });
@@ -435,7 +440,7 @@ function renderError(message) {
         <div class="text-red-400 text-3xl mb-3">&#x26A0;</div>
         <p class="text-red-400 font-semibold text-lg">エラー</p>
         <p class="text-red-300/70 mt-2 text-sm leading-relaxed">${escapeHtml(message)}</p>
-        <button onclick="location.reload()" class="mt-5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 px-5 py-2.5 rounded-xl text-sm transition-colors font-medium">ページを再読み込み</button>
+        <button class="reload-btn mt-5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 px-5 py-2.5 rounded-xl text-sm transition-colors font-medium">ページを再読み込み</button>
     </div>`;
 }
 

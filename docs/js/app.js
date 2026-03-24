@@ -178,7 +178,7 @@ function init() {
         const div = document.createElement('div');
         div.className = 'analyzer-card bg-gs-card rounded-2xl p-4 sm:p-5 cursor-pointer';
         div.setAttribute('data-analyzer', key);
-        div.onclick = () => runAnalysis(key);
+        div.addEventListener('click', () => runAnalysis(key));
         div.innerHTML = `
             <div class="flex items-start gap-3">
                 <div class="text-2xl flex-shrink-0 mt-0.5">${a.icon}</div>
@@ -193,6 +193,40 @@ function init() {
 
     document.getElementById('tickerInput').addEventListener('keydown', e => {
         if (e.key === 'Enter') searchStock();
+    });
+
+    // ボタンイベント（inline onclick 排除）
+    const searchBtn = document.getElementById('searchBtn');
+    if (searchBtn) searchBtn.addEventListener('click', () => searchStock());
+
+    const shortcutsBtn = document.getElementById('shortcutsBtn');
+    if (shortcutsBtn) shortcutsBtn.addEventListener('click', () => showShortcutsModal());
+
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    if (closeModalBtn) closeModalBtn.addEventListener('click', () => hideShortcutsModal());
+
+    const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+    if (clearHistoryBtn) clearHistoryBtn.addEventListener('click', () => clearSearchHistory());
+
+    const submitParamsBtn = document.getElementById('submitParamsBtn');
+    if (submitParamsBtn) submitParamsBtn.addEventListener('click', () => submitWithParams());
+
+    // モーダル背景クリックで閉じる
+    const shortcutsModal = document.getElementById('shortcutsModal');
+    if (shortcutsModal) {
+        shortcutsModal.addEventListener('click', (e) => {
+            if (e.target === shortcutsModal) hideShortcutsModal();
+        });
+    }
+
+    // クイック銘柄ボタン
+    document.querySelectorAll('.quick-ticker').forEach(btn => {
+        btn.addEventListener('click', () => quickTicker(btn.dataset.code));
+    });
+
+    // 動的生成ボタンのイベント委譲
+    document.addEventListener('click', (e) => {
+        if (e.target.id === 'reloadBtn') location.reload();
     });
 
     // Initialize features
@@ -377,7 +411,7 @@ function renderError(msg) {
         <p class="text-red-400 font-semibold text-lg">エラー</p>
         <p class="text-red-300/70 mt-2 text-sm leading-relaxed">${esc(msg)}</p>
         <p class="text-red-300/40 mt-3 text-xs">CORSプロキシの制限やYahoo Finance APIの仕様変更により<br>データを取得できない場合があります。</p>
-        <button onclick="location.reload()" class="mt-5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 px-5 py-2.5 rounded-xl text-sm transition-colors font-medium">ページを再読み込み</button>
+        <button class="mt-5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 px-5 py-2.5 rounded-xl text-sm transition-colors font-medium" id="reloadBtn">ページを再読み込み</button>
     </div>`;
 }
 

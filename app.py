@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import math
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from flask import Flask, render_template, request, jsonify
@@ -257,12 +258,21 @@ def analyze_all():
     results: dict[str, Any] = {}
     errors: dict[str, str] = {}
 
-    for key in ANALYZERS:
+    def _run_one(key: str) -> tuple[str, dict | None, str | None]:
         try:
-            results[key] = _safe_serialize(_run_analyzer(key, stock_data, params))
+            return key, _safe_serialize(_run_analyzer(key, stock_data, params)), None
         except Exception as e:
             logger.warning("アナライザー %s でエラー: %s", key, e)
-            errors[key] = str(e)
+            return key, None, str(e)
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {executor.submit(_run_one, key): key for key in ANALYZERS}
+        for future in as_completed(futures):
+            key, result, error = future.result()
+            if error:
+                errors[key] = error
+            elif result is not None:
+                results[key] = result
 
     return jsonify({
         "success": True,

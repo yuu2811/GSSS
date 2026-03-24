@@ -293,7 +293,7 @@
             </div>
         </div>
         <div class="flex items-center gap-2 sm:gap-3">
-            <button onclick="showShortcutsModal()" class="hidden sm:flex items-center gap-1.5 text-gs-text-muted/50 hover:text-gs-text-muted transition-colors text-xs" title="キーボードショートカット">
+            <button id="shortcutsBtn" class="hidden sm:flex items-center gap-1.5 text-gs-text-muted/50 hover:text-gs-text-muted transition-colors text-xs" title="キーボードショートカット" aria-label="キーボードショートカットを表示">
                 <span class="kbd">/</span>
                 <span class="text-[10px]">検索</span>
             </button>
@@ -318,7 +318,7 @@
                         class="input-glow w-full bg-gs-darker border border-gs-border rounded-xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-white placeholder-gs-text-muted/50 focus:border-gs-accent focus:outline-none text-base transition-all duration-200"
                         placeholder="例: 7203, 9984, 6758">
                 </div>
-                <button onclick="searchStock()" class="btn-primary text-white px-5 sm:px-7 py-2.5 sm:py-3 rounded-xl font-medium whitespace-nowrap text-sm sm:text-base flex-shrink-0">
+                <button id="searchBtn" class="btn-primary text-white px-5 sm:px-7 py-2.5 sm:py-3 rounded-xl font-medium whitespace-nowrap text-sm sm:text-base flex-shrink-0" aria-label="銘柄を確認">
                     確認
                 </button>
             </div>
@@ -333,16 +333,16 @@
             <div id="searchHistory" class="mt-3 hidden">
                 <div class="flex items-center gap-1.5 mb-1.5">
                     <span class="text-[10px] text-gs-text-muted/40">最近の検索:</span>
-                    <button onclick="clearSearchHistory()" class="text-[10px] text-gs-text-muted/30 hover:text-red-400 transition-colors ml-auto">クリア</button>
+                    <button id="clearHistoryBtn" class="text-[10px] text-gs-text-muted/30 hover:text-red-400 transition-colors ml-auto" aria-label="検索履歴をクリア">クリア</button>
                 </div>
                 <div id="searchHistoryChips" class="flex flex-wrap gap-1.5"></div>
             </div>
             <div class="mt-3.5 flex flex-wrap items-center gap-1.5">
                 <span class="text-xs text-gs-text-muted/50 mr-0.5">例:</span>
-                <button onclick="quickTicker('7203')" class="ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg">7203 トヨタ</button>
-                <button onclick="quickTicker('9984')" class="ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg">9984 SBG</button>
-                <button onclick="quickTicker('6758')" class="ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg">6758 ソニー</button>
-                <button onclick="quickTicker('7974')" class="ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg">7974 任天堂</button>
+                <button class="quick-ticker ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg" data-code="7203">7203 トヨタ</button>
+                <button class="quick-ticker ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg" data-code="9984">9984 SBG</button>
+                <button class="quick-ticker ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg" data-code="6758">6758 ソニー</button>
+                <button class="quick-ticker ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg" data-code="7974">7974 任天堂</button>
             </div>
         </div>
     </section>
@@ -365,7 +365,7 @@
             </div>
             <div id="paramsContent" class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4"></div>
             <div class="mt-5">
-                <button onclick="submitWithParams()" class="btn-gold w-full sm:w-auto text-gs-darker px-7 py-2.5 sm:py-3 rounded-xl font-semibold text-base">
+                <button id="submitParamsBtn" class="btn-gold w-full sm:w-auto text-gs-darker px-7 py-2.5 sm:py-3 rounded-xl font-semibold text-base">
                     分析開始
                 </button>
             </div>
@@ -396,11 +396,11 @@
 </footer>
 
 <!-- Keyboard Shortcuts Modal -->
-<div id="shortcutsModal" class="hidden fixed inset-0 modal-overlay z-[100] flex items-center justify-center p-4" onclick="if(event.target===this)hideShortcutsModal()">
+<div id="shortcutsModal" class="hidden fixed inset-0 modal-overlay z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="キーボードショートカット">
     <div class="card-elevated rounded-2xl p-6 sm:p-8 max-w-sm w-full fade-in">
         <div class="flex items-center justify-between mb-5">
             <h3 class="text-white font-semibold text-base">キーボードショートカット</h3>
-            <button onclick="hideShortcutsModal()" class="text-gs-text-muted hover:text-white transition-colors text-lg">&times;</button>
+            <button id="closeModalBtn" class="text-gs-text-muted hover:text-white transition-colors text-lg" aria-label="閉じる">&times;</button>
         </div>
         <div class="space-y-3">
             <div class="flex justify-between items-center"><span class="text-gs-text-muted text-sm">検索にフォーカス</span><span class="kbd">/</span></div>
