@@ -197,6 +197,13 @@ function badge(text, color = 'gs-accent') {
     return `<span class="text-xs px-2.5 py-0.5 rounded-md font-medium ${SAFE_COLORS[color] || SAFE_COLORS['gs-accent']}">${escapeHtml(text)}</span>`;
 }
 
+function bulletList(items, colorClass = 'text-gs-text-muted') {
+    if (!items || items.length === 0) return '';
+    return `<div class="space-y-1.5">${items.map(item =>
+        `<div class="text-xs ${colorClass} flex gap-1.5"><span class="text-gs-accent/60">&#x2022;</span>${escapeHtml(item)}</div>`
+    ).join('')}</div>`;
+}
+
 function scoreBar(score, max, label = '') {
     const pct = Math.min((score / max) * 100, 100);
     const color = scoreColor(score, max);
@@ -240,9 +247,9 @@ function renderGoldman(d) {
     html += card('P/E比率分析', `${metric('現在PER', pe.current_pe != null ? pe.current_pe + '倍' : 'N/A')}${metric('フォワードPER', pe.forward_pe != null ? pe.forward_pe + '倍' : 'N/A')}${metric('評価', pe.assessment || 'N/A')}${scoreBar(pe.score || 5, 10, 'バリュエーション')}`);
     html += card('負債健全性チェック', `${metric('D/Eレシオ', debt.debt_to_equity != null ? debt.debt_to_equity + '倍' : 'N/A')}${metric('総負債', formatCurrency(debt.total_debt))}${metric('手元現金', formatCurrency(debt.total_cash))}${metric('健全性', debt.health || 'N/A')}${scoreBar(debt.score || 5, 10, '財務健全性')}`);
     html += card('配当分析', `${metric('配当利回り', div.yield_pct != null ? div.yield_pct + '%' : '0%')}${metric('年間配当', div.annual_rate ? '¥' + formatNumber(div.annual_rate) : 'N/A')}${metric('配当性向', div.payout_ratio_pct != null ? div.payout_ratio_pct + '%' : 'N/A')}${metric('持続可能性', div.sustainability || 'N/A')}${scoreBar(div.score || 5, 10, '配当安全性')}`);
-    html += card('競争優位性（モート）', `<div class="text-center mb-4"><span class="text-2xl text-white font-bold">${escapeHtml(moat.rating || 'N/A')}</span></div>${scoreBar(moat.score || 0, moat.max_score || 11, 'モートスコア')}<div class="mt-3 space-y-1.5">${(moat.reasons || []).map(r => `<div class="text-xs text-gs-text-muted flex gap-1.5"><span class="text-gs-accent/60">&#x2022;</span>${escapeHtml(r)}</div>`).join('')}</div>`);
+    html += card('競争優位性（モート）', `<div class="text-center mb-4"><span class="text-2xl text-white font-bold">${escapeHtml(moat.rating || 'N/A')}</span></div>${scoreBar(moat.score || 0, moat.max_score || 11, 'モートスコア')}<div class="mt-3">${bulletList(moat.reasons)}</div>`);
     html += card('12ヶ月価格ターゲット', `${metric('強気ケース', pt.bull_target ? '¥' + formatNumber(pt.bull_target) : 'N/A', pt.upside_pct != null ? formatPercent(pt.upside_pct) : '')}${metric('ベースケース', pt.base_target ? '¥' + formatNumber(pt.base_target) : 'N/A')}${metric('弱気ケース', pt.bear_target ? '¥' + formatNumber(pt.bear_target) : 'N/A', pt.downside_pct != null ? formatPercent(pt.downside_pct) : '')}${pt.estimated ? '<div class="text-xs text-gs-text-muted/60 mt-3 italic">※推定値（アナリスト目標価格なし）</div>' : ''}`);
-    html += card('リスク評価', `${bigScore(risk.score || 'N/A', 10, null, riskColor)}<div class="mt-3 space-y-1.5">${(risk.reasons || []).map(r => `<div class="text-xs text-gs-text-muted flex gap-1.5"><span class="text-gs-accent/60">&#x2022;</span>${escapeHtml(r)}</div>`).join('')}</div>`);
+    html += card('リスク評価', `${bigScore(risk.score || 'N/A', 10, null, riskColor)}<div class="mt-3">${bulletList(risk.reasons)}</div>`);
     html += card('エントリー価格ゾーン', `${metric('積極的エントリー', ez.aggressive_entry ? '¥' + formatNumber(ez.aggressive_entry) : 'N/A')}${metric('理想的エントリー', ez.ideal_entry ? '¥' + formatNumber(ez.ideal_entry) : 'N/A')}${metric('保守的エントリー', ez.conservative_entry ? '¥' + formatNumber(ez.conservative_entry) : 'N/A')}${metric('ストップロス', ez.stop_loss ? '¥' + formatNumber(ez.stop_loss) : 'N/A', ez.stop_loss_pct != null ? ez.stop_loss_pct + '%' : '')}${metric('サポートライン', ez.support ? '¥' + formatNumber(ez.support) : 'N/A')}${metric('レジスタンスライン', ez.resistance ? '¥' + formatNumber(ez.resistance) : 'N/A')}`);
     html += card('収益成長トレンド', `${metric('トレンド', rev.trend || 'N/A')}${(rev.growth_rates || []).map((r, i) => metric(rev.years?.[i] || '', formatPercent(r))).join('')}`);
     html += '</div>';
@@ -363,7 +370,7 @@ function renderBlackRock(d) {
     html += card('配当利回り分析', `${metric('現在利回り', ya.current_yield_pct ? ya.current_yield_pct + '%' : '0%')}${metric('5年平均利回り', ya.five_year_avg_yield ? ya.five_year_avg_yield + '%' : 'N/A')}${metric('年間配当', ya.dividend_rate ? '¥' + formatNumber(ya.dividend_rate) : 'N/A')}${metric('評価', ya.assessment || 'N/A')}`);
     const sf = d.safety || {};
     const sfColor = sf.score >= 7 ? 'text-green-400' : sf.score >= 5 ? 'text-yellow-400' : 'text-red-400';
-    html += card('配当安全性スコア', `${bigScore(sf.score, 10, sf.label, () => sfColor)}${scoreBar(sf.score || 0, 10, '安全性')}<div class="mt-2 space-y-1">${(sf.reasons || []).map(r => `<div class="text-xs text-gs-text-muted flex gap-1.5"><span class="text-gs-accent/60">&#x2022;</span>${escapeHtml(r)}</div>`).join('')}</div>`);
+    html += card('配当安全性スコア', `${bigScore(sf.score, 10, sf.label, () => sfColor)}${scoreBar(sf.score || 0, 10, '安全性')}<div class="mt-2">${bulletList(sf.reasons)}</div>`);
     const ga = d.growth_analysis || {};
     html += card('配当成長履歴', `${metric('連続増配年数', ga.consecutive_increases + '年')}${metric('CAGR', ga.cagr_pct ? ga.cagr_pct + '%' : 'N/A')}${metric('ステータス', ga.status || 'N/A')}${Object.entries(ga.annual_dividends || {}).map(([y, v]) => metric(y + '年', '¥' + formatNumber(v, 2))).join('')}`);
     const ip = d.income_projection || {};
@@ -373,7 +380,7 @@ function renderBlackRock(d) {
         html += card('DRIP再投資シミュレーション', `${metric('初期株数', drip.initial_shares ? drip.initial_shares + '株' : 'N/A')}${metric('10年後株数', drip.year_10.shares + '株')}${metric('10年後評価額', formatCurrency(drip.year_10.total_value))}${metric('10年後累計配当', formatCurrency(drip.year_10.cumulative_dividends))}${drip.year_20 ? metric('20年後評価額', formatCurrency(drip.year_20.total_value)) : ''}${metric('20年間トータルリターン', drip.total_return_20y ? '+' + drip.total_return_20y + '%' : 'N/A')}<div class="text-xs text-gs-text-muted/60 mt-3 italic">前提: ${escapeHtml(drip.assumptions ? drip.assumptions.price_growth + ' / 配当' + drip.assumptions.dividend_growth : '')}</div>`);
     }
     const yt = d.yield_trap || {};
-    html += card('イールドトラップチェック', `<div class="mb-3">${yt.is_potential_trap ? badge('要注意', 'red') : badge('問題なし', 'green')}</div>${(yt.warnings || []).map(w => `<div class="text-xs py-1 flex gap-1.5 ${yt.is_potential_trap ? 'text-red-400' : 'text-gs-text-muted'}"><span>&#x2022;</span>${escapeHtml(w)}</div>`).join('')}`);
+    html += card('イールドトラップチェック', `<div class="mb-3">${yt.is_potential_trap ? badge('要注意', 'red') : badge('問題なし', 'green')}</div>${bulletList(yt.warnings, yt.is_potential_trap ? 'text-red-400' : 'text-gs-text-muted')}`);
     const ex = d.ex_dividend || {};
     html += card('配当落ち日', `${metric('次回配当落ち日', ex.ex_dividend_date || '未定')}${metric('配当額', ex.dividend_rate ? '¥' + formatNumber(ex.dividend_rate) : 'N/A')}${ex.note ? `<div class="text-xs text-gs-text-muted/60 mt-3 italic">${escapeHtml(ex.note)}</div>` : ''}`);
     html += '</div>';
@@ -431,7 +438,7 @@ function renderRenaissance(d) {
     html += '<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">';
     [['value_factors', 'バリューファクター'], ['quality_factors', 'クオリティファクター'], ['momentum_factors', 'モメンタムファクター'], ['growth_factors', '成長ファクター'], ['sentiment_factors', 'センチメントファクター']].forEach(([key, name]) => {
         const f = d[key] || {};
-        html += card(`${name} (${f.score || 0}/100)`, `${scoreBar(f.score || 0, 100, name)}<div class="space-y-1.5">${(f.details || []).map(detail => `<div class="text-xs text-gs-text-muted flex gap-1.5"><span class="text-gs-accent/60">&#x2022;</span>${escapeHtml(detail)}</div>`).join('')}</div>`);
+        html += card(`${name} (${f.score || 0}/100)`, `${scoreBar(f.score || 0, 100, name)}${bulletList(f.details)}`);
     });
     html += '</div>';
     return html;
@@ -454,9 +461,9 @@ function renderVanguard(d) {
         etfs.map(e => [{ html: `<div class="font-medium text-white">${escapeHtml(e.name)}</div><div class="text-gs-text-muted/60">${escapeHtml(e.ticker)}</div>` }, { text: e.allocation_pct + '%' }, { text: '¥' + formatNumber(e.amount) }, { text: e.expense_ratio + '%' }]),
     ));
     const rb = d.rebalance_rules || {};
-    html += card('リバランスルール', `${metric('頻度', rb.frequency || 'N/A')}${metric('閾値', rb.threshold_pct ? '±' + rb.threshold_pct + '%' : 'N/A')}${(rb.rules || []).map(r => `<div class="text-xs text-gs-text-muted py-1 flex gap-1.5"><span class="text-gs-accent/60">&#x2022;</span>${escapeHtml(r)}</div>`).join('')}`);
+    html += card('リバランスルール', `${metric('頻度', rb.frequency || 'N/A')}${metric('閾値', rb.threshold_pct ? '±' + rb.threshold_pct + '%' : 'N/A')}${bulletList(rb.rules)}`);
     const tax = d.tax_optimization || {};
-    html += card('税務最適化', `<div class="mb-4"><h4 class="text-xs text-gs-accent mb-2 font-semibold">NISA口座推奨</h4>${(tax.nisa_account?.recommended || []).map(n => `<div class="text-xs text-gs-text-muted flex gap-1.5"><span class="text-gs-accent/60">&#x2022;</span>${escapeHtml(n)}</div>`).join('')}<div class="text-xs text-gs-text-muted/60 mt-1.5 italic">${escapeHtml(tax.nisa_account?.reason || '')}</div></div><div><h4 class="text-xs text-gs-accent mb-2 font-semibold">特定口座推奨</h4>${(tax.tokutei_account?.recommended || []).map(n => `<div class="text-xs text-gs-text-muted flex gap-1.5"><span class="text-gs-accent/60">&#x2022;</span>${escapeHtml(n)}</div>`).join('')}<div class="text-xs text-gs-text-muted/60 mt-1.5 italic">${escapeHtml(tax.tokutei_account?.reason || '')}</div></div>${(tax.notes || []).map(n => `<div class="text-xs text-gs-text-muted/50 mt-2">※ ${escapeHtml(n)}</div>`).join('')}`);
+    html += card('税務最適化', `<div class="mb-4"><h4 class="text-xs text-gs-accent mb-2 font-semibold">NISA口座推奨</h4>${bulletList(tax.nisa_account?.recommended)}<div class="text-xs text-gs-text-muted/60 mt-1.5 italic">${escapeHtml(tax.nisa_account?.reason || '')}</div></div><div><h4 class="text-xs text-gs-accent mb-2 font-semibold">特定口座推奨</h4>${bulletList(tax.tokutei_account?.recommended)}<div class="text-xs text-gs-text-muted/60 mt-1.5 italic">${escapeHtml(tax.tokutei_account?.reason || '')}</div></div>${(tax.notes || []).map(n => `<div class="text-xs text-gs-text-muted/50 mt-2">※ ${escapeHtml(n)}</div>`).join('')}`);
     const dca = d.dca_plan || {};
     html += card('ドルコスト平均法計画', `${metric('月次投資額合計', formatCurrency(dca.total_monthly))}${(dca.allocation || []).map(a => metric(a.etf, '¥' + formatNumber(a.monthly_amount) + '/月')).join('')}<div class="text-xs text-gs-text-muted/60 mt-3 italic">${escapeHtml(dca.strategy || '')}</div>`);
     html += '</div>';
@@ -496,7 +503,7 @@ function renderMcKinsey(d) {
     html += card('グローバルリスクファクター', grBody);
     html += card('影響タイムライン', `${(d.timeline || []).map(t => `<div class="py-2.5 border-b border-gs-border/20 last:border-0"><div class="text-sm text-gs-accent font-medium">${escapeHtml(t.period)}</div><div class="text-xs text-gs-text-muted mt-0.5">${escapeHtml(t.focus)}</div></div>`).join('')}`);
     const adj = d.portfolio_adjustments || {};
-    html += card('ポートフォリオ調整提案', `<div class="space-y-1.5">${(adj.recommended_actions || []).map(a => `<div class="text-xs text-gs-text-muted flex gap-1.5"><span class="text-gs-accent/60">&#x2022;</span>${escapeHtml(a)}</div>`).join('')}</div><div class="mt-4 p-4 bg-gs-darker/60 rounded-xl text-sm text-white leading-relaxed">${escapeHtml(adj.overall_stance || '')}</div>`);
+    html += card('ポートフォリオ調整提案', `${bulletList(adj.recommended_actions)}<div class="mt-4 p-4 bg-gs-darker/60 rounded-xl text-sm text-white leading-relaxed">${escapeHtml(adj.overall_stance || '')}</div>`);
     html += '</div>';
     return html;
 }
@@ -756,9 +763,7 @@ function renderAcademicQuant(d) {
         });
 
         // Details list
-        body += `<div class="mt-2 space-y-1.5">${(f.details || []).map(detail =>
-            `<div class="text-xs text-gs-text-muted flex gap-1.5"><span class="text-gs-accent/60">&#x2022;</span>${escapeHtml(detail)}</div>`
-        ).join('')}</div>`;
+        body += `<div class="mt-2">${bulletList(f.details)}</div>`;
 
         html += card(`${name} (${f.score ?? 0}/100)`, body);
     });

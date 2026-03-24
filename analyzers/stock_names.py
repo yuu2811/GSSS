@@ -1,5 +1,7 @@
 """日本株の銘柄名データベース - 銘柄名から銘柄コードを検索可能にする"""
 
+from __future__ import annotations
+
 
 # 主要な日本株の銘柄名とコードのマッピング
 # フォーマット: (コード, 正式名称, 略称/通称リスト)
@@ -244,7 +246,30 @@ STOCK_DATABASE = [
 ]
 
 
-def search_stocks(query: str, max_results: int = 10) -> list:
+# ── 高速検索用インデックス（モジュール読み込み時に一度だけ構築）──
+
+# コード → (名称, aliases) の O(1) ルックアップ
+_CODE_INDEX: dict[str, tuple[str, list[str]]] = {}
+# 全名称/略称 → (コード, 正式名称) のリスト（名前検索用）
+_NAME_INDEX: list[tuple[str, str, list[str]]] = []
+
+
+def _build_indexes():
+    """STOCK_DATABASE からインデックスを構築する。"""
+    global _CODE_INDEX, _NAME_INDEX
+    _CODE_INDEX = {code: (name, aliases) for code, name, aliases in STOCK_DATABASE}
+    # 名前検索用: 事前に lower 変換した名称リストをキャッシュ
+    _NAME_INDEX = [
+        (code, name, [name.lower()] + [a.lower() for a in aliases])
+        for code, name, aliases in STOCK_DATABASE
+    ]
+
+
+# モジュール読み込み時にインデックス構築
+_build_indexes()
+
+
+def search_stocks(query: str, max_results: int = 10) -> list[tuple[str, str]]:
     """銘柄名またはコードで検索
 
     Args:
@@ -254,66 +279,60 @@ def search_stocks(query: str, max_results: int = 10) -> list:
     Returns:
         [(コード, 名称), ...] のリスト
     """
-    query = query.strip().upper()
-    query_lower = query.strip().lower()
+    query = query.strip()
     if not query:
         return []
 
-    results = []
-    # 完全一致（コード）
-    for code, name, aliases in STOCK_DATABASE:
-        if code == query or code == query.replace(".T", ""):
+    code_query = query.replace(".T", "")
+    q_lower = query.lower()
+
+    seen: set[str] = set()
+    results: list[tuple[str, str]] = []
+
+    def _add(code: str, name: str):
+        if code not in seen:
+            seen.add(code)
             results.append((code, name))
-            break
 
-    # 前方一致（コード）
-    if not results:
-        for code, name, aliases in STOCK_DATABASE:
-            if code.startswith(query.replace(".T", "")):
-                results.append((code, name))
+    # 1. コード完全一致（O(1)）
+    if code_query in _CODE_INDEX:
+        name, _ = _CODE_INDEX[code_query]
+        _add(code_query, name)
+        return results
 
-    # 名前の部分一致検索
-    query_variants = [query, query_lower, query.strip()]
-    for code, name, aliases in STOCK_DATABASE:
-        if (code, name) in results:
+    # 2. コード前方一致
+    if code_query.isdigit():
+        for code, (name, _) in _CODE_INDEX.items():
+            if code.startswith(code_query):
+                _add(code, name)
+                if len(results) >= max_results:
+                    return results
+
+    # 3. 名前検索（完全一致 → 前方一致 → 部分一致 の優先度）
+    exact: list[tuple[str, str]] = []
+    prefix: list[tuple[str, str]] = []
+    partial: list[tuple[str, str]] = []
+
+    for code, name, lower_names in _NAME_INDEX:
+        if code in seen:
             continue
+        if q_lower in lower_names:
+            exact.append((code, name))
+        elif any(n.startswith(q_lower) for n in lower_names):
+            prefix.append((code, name))
+        elif any(q_lower in n for n in lower_names):
+            partial.append((code, name))
 
-        name_lower = name.lower()
-        all_names = [name_lower] + [a.lower() for a in aliases]
-
-        for q in query_variants:
-            q_lower = q.lower()
-            # 完全一致
-            if q_lower in all_names:
-                results.insert(0, (code, name))
-                break
-            # 前方一致
-            if any(n.startswith(q_lower) for n in all_names):
-                results.append((code, name))
-                break
-            # 部分一致
-            if any(q_lower in n for n in all_names):
-                results.append((code, name))
-                break
-
+    for code, name in exact + prefix + partial:
+        _add(code, name)
         if len(results) >= max_results:
             break
 
-    # 重複除去
-    seen = set()
-    unique_results = []
-    for code, name in results:
-        if code not in seen:
-            seen.add(code)
-            unique_results.append((code, name))
-
-    return unique_results[:max_results]
+    return results[:max_results]
 
 
 def get_name_by_code(code: str) -> str | None:
-    """コードから銘柄名を取得（ローカルDB）"""
+    """コードから銘柄名を取得（O(1) ルックアップ）"""
     code = code.replace(".T", "").strip()
-    for c, name, _ in STOCK_DATABASE:
-        if c == code:
-            return name
-    return None
+    entry = _CODE_INDEX.get(code)
+    return entry[0] if entry else None

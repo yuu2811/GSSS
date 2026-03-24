@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
+
+from .base import BaseAnalyzer
+from .config import PATTERN_SIMILARITY_THRESHOLD, PATTERN_MIN_SEPARATION, SR_CLUSTER_THRESHOLD
 from .stock_data import StockDataFetcher, StockData, AnalysisResult
 
+logger = logging.getLogger(__name__)
 
-class ChartPattern:
+
+class ChartPattern(BaseAnalyzer):
     """古典的チャートパターン、ローソク足パターン、トレンド分析"""
 
     NAME = "チャートパターン分析"
@@ -89,7 +96,7 @@ class ChartPattern:
             peaks = ChartPattern._find_pivots(high.tail(60).values, mode="peak")
             if len(peaks) >= 2:
                 p1, p2 = peaks[-2], peaks[-1]
-                if p1[1] > 0 and abs(p1[1] - p2[1]) / p1[1] < 0.03 and p2[0] - p1[0] >= 10:
+                if p1[1] > 0 and abs(p1[1] - p2[1]) / p1[1] < PATTERN_SIMILARITY_THRESHOLD and p2[0] - p1[0] >= PATTERN_MIN_SEPARATION:
                     neckline = float(low.tail(60).iloc[p1[0]:p2[0]].min())
                     target = neckline - (p1[1] - neckline)
                     patterns.append({
@@ -446,7 +453,7 @@ class ChartPattern:
                 support_prices.append(float(l_vals[i]))
 
         # Cluster nearby levels
-        def cluster(prices, threshold=0.02):
+        def cluster(prices, threshold=SR_CLUSTER_THRESHOLD):
             if not prices:
                 return []
             prices.sort()

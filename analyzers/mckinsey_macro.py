@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import logging
+
 import yfinance as yf
 
+from .base import BaseAnalyzer
+from .config import HIGH_RATE_THRESHOLD, MID_RATE_THRESHOLD, USDJPY_WEAK_YEN, USDJPY_SLIGHT_WEAK, USDJPY_FAIR_VALUE
 
-class McKinseyMacro:
+logger = logging.getLogger(__name__)
+
+
+class McKinseyMacro(BaseAnalyzer):
     """マッキンゼー流のマクロ経済分析"""
 
     NAME = "McKinsey マクロ経済レポート"
@@ -62,7 +69,7 @@ class McKinseyMacro:
                     "change_ytd": round(((hist["Close"].iloc[-1] / hist["Close"].iloc[0]) - 1) * 100, 1),
                 }
         except Exception:
-            pass
+            logger.debug("マクロ指標取得エラー", exc_info=True)
 
         # ドル円
         try:
@@ -75,7 +82,7 @@ class McKinseyMacro:
                     "change_ytd": round(((hist["Close"].iloc[-1] / hist["Close"].iloc[0]) - 1) * 100, 1),
                 }
         except Exception:
-            pass
+            logger.debug("マクロ指標取得エラー", exc_info=True)
 
         # 米国10年債利回り（代替指標）
         try:
@@ -86,7 +93,7 @@ class McKinseyMacro:
                     "current": round(hist["Close"].iloc[-1], 2),
                 }
         except Exception:
-            pass
+            logger.debug("マクロ指標取得エラー", exc_info=True)
 
         # VIX
         try:
@@ -97,7 +104,7 @@ class McKinseyMacro:
                     "current": round(hist["Close"].iloc[-1], 1),
                 }
         except Exception:
-            pass
+            logger.debug("マクロ指標取得エラー", exc_info=True)
 
         # S&P500
         try:
@@ -109,7 +116,7 @@ class McKinseyMacro:
                     "change_ytd": round(((hist["Close"].iloc[-1] / hist["Close"].iloc[0]) - 1) * 100, 1),
                 }
         except Exception:
-            pass
+            logger.debug("マクロ指標取得エラー", exc_info=True)
 
         return indicators
 
@@ -117,12 +124,12 @@ class McKinseyMacro:
     def _interest_rate_analysis(indicators):
         us10y = indicators.get("us10y", {}).get("current", 4.0)
 
-        if us10y > 4.5:
+        if us10y > HIGH_RATE_THRESHOLD:
             environment = "高金利環境"
             impact_growth = "成長株に逆風（割引率上昇で現在価値低下）"
             impact_value = "バリュー株・高配当株に追い風"
             impact_real_estate = "不動産セクターに逆風"
-        elif us10y > 3.0:
+        elif us10y > MID_RATE_THRESHOLD:
             environment = "中程度の金利環境"
             impact_growth = "成長株への影響は限定的"
             impact_value = "バリュー株は安定"
@@ -150,17 +157,17 @@ class McKinseyMacro:
         rate = usdjpy.get("current", 150)
         change_1m = usdjpy.get("change_1m", 0)
 
-        if rate > 150:
+        if rate > USDJPY_WEAK_YEN:
             yen_status = "円安水準"
             impact = "輸出企業に追い風、輸入企業・内需にはコスト増"
             beneficiaries = ["自動車（7203.T トヨタ等）", "電子部品", "精密機器"]
             losers = ["食品", "小売", "エネルギー輸入企業"]
-        elif rate > 130:
+        elif rate > USDJPY_SLIGHT_WEAK:
             yen_status = "やや円安"
             impact = "輸出企業にやや有利"
             beneficiaries = ["自動車", "電子機器"]
             losers = ["輸入依存企業"]
-        elif rate > 110:
+        elif rate > USDJPY_FAIR_VALUE:
             yen_status = "適正水準"
             impact = "為替の影響は限定的"
             beneficiaries = []

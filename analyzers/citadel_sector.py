@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import logging
+
 import yfinance as yf
 
+from .base import BaseAnalyzer
 
-class CitadelSector:
+logger = logging.getLogger(__name__)
+
+
+class CitadelSector(BaseAnalyzer):
     """シタデル流のセクターローテーション分析"""
 
     NAME = "Citadel セクターローテーション"
@@ -87,6 +93,7 @@ class CitadelSector:
                     "momentum": "上昇" if (ret_1m is not None and ret_1m > 0) else ("下降" if ret_1m is not None else "データなし"),
                 })
             except Exception:
+                logger.debug("セクターETF %s のデータ取得失敗", info["ticker"], exc_info=True)
                 continue
 
         # パフォーマンスでソート
@@ -142,6 +149,7 @@ class CitadelSector:
                 "avoid_sectors": avoid,
             }
         except Exception:
+            logger.warning("経済サイクル判定に失敗", exc_info=True)
             return {"phase": "判定不可", "description": "市場データ取得エラー"}
 
     @staticmethod

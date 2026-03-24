@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-import yfinance as yf
-import pandas as pd
-import numpy as np
+import logging
 from datetime import datetime, timedelta
 from typing import Any
 
+import numpy as np
+import pandas as pd
+import yfinance as yf
+
+from .config import TRADING_DAYS_PER_YEAR
 from .stock_names import search_stocks, get_name_by_code
+
+logger = logging.getLogger(__name__)
 
 # 型エイリアス — アナライザー間で共通利用
 StockData = dict[str, Any]  # fetch() の戻り値型
@@ -111,7 +116,7 @@ class StockDataFetcher:
                 if name:
                     return [{"ticker": ticker, "name": name, "code": code}]
             except Exception:
-                pass
+                logger.debug("yfinance検索失敗: %s", ticker, exc_info=True)
 
         return []
 
@@ -146,7 +151,7 @@ class StockDataFetcher:
             try:
                 result[key] = fetcher()
             except Exception:
-                pass  # defaults から既に設定済み
+                logger.debug("データ取得失敗: %s (ticker=%s)", key, ticker, exc_info=True)
 
         # 不足データを財務諸表から補完
         StockDataFetcher._enrich_info(result)
@@ -242,7 +247,7 @@ class StockDataFetcher:
                     if eps > 0 and annual_div > 0:
                         info["payoutRatio"] = annual_div / eps
             except Exception:
-                pass
+                logger.debug("配当性向補完に失敗", exc_info=True)
 
         data["info"] = info
 
@@ -266,7 +271,7 @@ class StockDataFetcher:
 
         if history is not None and not history.empty:
             close = history["Close"]
-            recent_year = close.iloc[-252:] if len(close) >= 252 else close
+            recent_year = close.iloc[-TRADING_DAYS_PER_YEAR:] if len(close) >= TRADING_DAYS_PER_YEAR else close
             if not info.get("fiftyTwoWeekHigh"):
                 info["fiftyTwoWeekHigh"] = float(recent_year.max())
             if not info.get("fiftyTwoWeekLow"):
@@ -331,7 +336,7 @@ class StockDataFetcher:
                         if not info.get("dividendRate"):
                             info["dividendRate"] = annual_div
             except Exception:
-                pass
+                logger.debug("配当利回り補完に失敗", exc_info=True)
 
     @staticmethod
     def _enrich_growth_rates(info, financials):
@@ -382,6 +387,7 @@ class StockDataFetcher:
         try:
             return stock.history(period=period)
         except Exception:
+            logger.debug("価格履歴取得失敗: %s", ticker, exc_info=True)
             return pd.DataFrame()
 
     @staticmethod
@@ -394,6 +400,7 @@ class StockDataFetcher:
                 stock = yf.Ticker(ticker)
                 result[name] = stock.history(period=period)
             except Exception:
+                logger.debug("市場指数取得失敗: %s", ticker, exc_info=True)
                 result[name] = pd.DataFrame()
         return result
 
@@ -410,6 +417,7 @@ class StockDataFetcher:
             info = stock.info or {}
             return info.get("longName", info.get("shortName", ticker))
         except Exception:
+            logger.debug("会社名取得失敗: %s", ticker, exc_info=True)
             return ticker
 
     @staticmethod
@@ -503,7 +511,7 @@ class StockDataFetcher:
 
         result = {
             "daily_volatility": returns.std(),
-            "annual_volatility": returns.std() * np.sqrt(252),
+            "annual_volatility": returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR),
             "max_drawdown": 0,
             "max_drawdown_date": None,
         }

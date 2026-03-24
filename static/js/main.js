@@ -47,14 +47,27 @@ function renderSearchHistory() {
         return;
     }
     container.classList.remove('hidden');
-    chips.innerHTML = history.map(h => {
+    chips.innerHTML = '';
+    history.forEach(h => {
         const code = h.ticker.replace('.T', '');
         const label = h.name ? `${code} ${h.name.substring(0, 6)}` : code;
-        return `<div class="history-chip ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg flex items-center gap-1.5 cursor-pointer" onclick="quickTicker('${escapeHtml(code)}')">
-            <span>${escapeHtml(label)}</span>
-            <button class="close-btn text-gs-text-muted/40 hover:text-red-400 text-sm leading-none" onclick="event.stopPropagation();removeFromHistory('${escapeHtml(h.ticker)}')">&times;</button>
-        </div>`;
-    }).join('');
+
+        const chip = document.createElement('div');
+        chip.className = 'history-chip ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg flex items-center gap-1.5 cursor-pointer';
+        chip.addEventListener('click', () => quickTicker(code));
+
+        const span = document.createElement('span');
+        span.textContent = label;
+        chip.appendChild(span);
+
+        const btn = document.createElement('button');
+        btn.className = 'close-btn text-gs-text-muted/40 hover:text-red-400 text-sm leading-none';
+        btn.innerHTML = '&times;';
+        btn.addEventListener('click', (e) => { e.stopPropagation(); removeFromHistory(h.ticker); });
+        chip.appendChild(btn);
+
+        chips.appendChild(chip);
+    });
 }
 
 function quickTicker(code) {
@@ -163,14 +176,25 @@ function showSuggestions(results) {
         return;
     }
 
-    container.innerHTML = results.map((r, i) => {
+    container.innerHTML = '';
+    results.forEach((r) => {
         const code = (r.code || r.ticker || '').replace('.T', '');
-        return `<div class="suggestion-item px-4 py-2.5 cursor-pointer hover:bg-gs-accent/10 transition-colors border-b border-gs-border/30 last:border-b-0 flex items-center gap-3"
-                     onclick="selectSuggestion('${escapeHtml(code)}', '${escapeHtml(r.name)}')">
-            <span class="text-gs-accent font-mono text-sm font-semibold min-w-[3.5rem]">${escapeHtml(code)}</span>
-            <span class="text-white text-sm truncate">${escapeHtml(r.name)}</span>
-        </div>`;
-    }).join('');
+        const item = document.createElement('div');
+        item.className = 'suggestion-item px-4 py-2.5 cursor-pointer hover:bg-gs-accent/10 transition-colors border-b border-gs-border/30 last:border-b-0 flex items-center gap-3';
+        item.addEventListener('click', () => selectSuggestion(code, r.name));
+
+        const codeSpan = document.createElement('span');
+        codeSpan.className = 'text-gs-accent font-mono text-sm font-semibold min-w-[3.5rem]';
+        codeSpan.textContent = code;
+        item.appendChild(codeSpan);
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'text-white text-sm truncate';
+        nameSpan.textContent = r.name;
+        item.appendChild(nameSpan);
+
+        container.appendChild(item);
+    });
     container.classList.remove('hidden');
 }
 
@@ -238,8 +262,35 @@ document.addEventListener('DOMContentLoaded', () => {
     tickerInput.addEventListener('input', (e) => {
         onSearchInput(e.target.value.trim());
     });
-    // クリック外でサジェストを閉じる
+
+    // ボタンイベント（inline onclick を排除）
+    const searchBtn = document.getElementById('searchBtn');
+    if (searchBtn) searchBtn.addEventListener('click', () => searchStock());
+
+    const shortcutsBtn = document.getElementById('shortcutsBtn');
+    if (shortcutsBtn) shortcutsBtn.addEventListener('click', () => showShortcutsModal());
+
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    if (closeModalBtn) closeModalBtn.addEventListener('click', () => hideShortcutsModal());
+
+    const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+    if (clearHistoryBtn) clearHistoryBtn.addEventListener('click', () => clearSearchHistory());
+
+    // モーダル背景クリックで閉じる
+    const shortcutsModal = document.getElementById('shortcutsModal');
+    if (shortcutsModal) {
+        shortcutsModal.addEventListener('click', (e) => {
+            if (e.target === shortcutsModal) hideShortcutsModal();
+        });
+    }
+
+    // クリック外でサジェストを閉じる + 動的ボタンイベント委譲
     document.addEventListener('click', (e) => {
+        // 動的生成ボタン
+        if (e.target.closest('.reload-btn')) { location.reload(); return; }
+        const tabBtn = e.target.closest('.analysis-tab');
+        if (tabBtn && tabBtn.dataset.tab) { switchTab(tabBtn.dataset.tab); return; }
+        // サジェスト外クリック
         if (!e.target.closest('#tickerInput') && !e.target.closest('#suggestionsContainer')) {
             hideSuggestions();
         }
@@ -340,7 +391,7 @@ function renderAllResults(allResults, analyzers, errors) {
     orderedKeys.forEach((key, i) => {
         const info = analyzers[key] || {};
         const active = i === 0 ? 'bg-gs-accent/20 text-gs-accent border-gs-accent/40' : 'bg-gs-darker/60 text-gs-text-muted border-gs-border/30 hover:border-gs-accent/30 hover:text-white';
-        tabsHtml += `<button class="analysis-tab px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium border transition-all duration-200 ${active}" data-tab="${key}" onclick="switchTab('${key}')">
+        tabsHtml += `<button class="analysis-tab px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium border transition-all duration-200 ${active}" data-tab="${key}">
             <span class="mr-1">${info.icon || ''}</span>${escapeHtml(info.short || key)}
         </button>`;
     });
@@ -389,7 +440,7 @@ function renderError(message) {
         <div class="text-red-400 text-3xl mb-3">&#x26A0;</div>
         <p class="text-red-400 font-semibold text-lg">エラー</p>
         <p class="text-red-300/70 mt-2 text-sm leading-relaxed">${escapeHtml(message)}</p>
-        <button onclick="location.reload()" class="mt-5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 px-5 py-2.5 rounded-xl text-sm transition-colors font-medium">ページを再読み込み</button>
+        <button class="reload-btn mt-5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 px-5 py-2.5 rounded-xl text-sm transition-colors font-medium">ページを再読み込み</button>
     </div>`;
 }
 

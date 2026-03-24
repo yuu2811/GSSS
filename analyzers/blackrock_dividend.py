@@ -2,12 +2,24 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
+from .base import BaseAnalyzer
+from .config import (
+    DIVIDEND_YIELD_BRACKETS, PAYOUT_RATIO_BRACKETS,
+    DRIP_PRICE_GROWTH_ASSUMPTION, PROJECTION_YEARS,
+    YIELD_TRAP_YIELD_THRESHOLD, YIELD_TRAP_PAYOUT_THRESHOLD,
+    YIELD_TRAP_PRICE_DROP_THRESHOLD,
+    DIVIDEND_KING_YEARS, DIVIDEND_ARISTOCRAT_YEARS, DIVIDEND_STABLE_YEARS,
+    score_by_brackets,
+)
 from .stock_data import StockDataFetcher, StockData, AnalysisResult
 
+logger = logging.getLogger(__name__)
 
-class BlackRockDividend:
+
+class BlackRockDividend(BaseAnalyzer):
     """ブラックロック流の配当分析"""
 
     NAME = "BlackRock 配当インカム分析"
@@ -69,16 +81,7 @@ class BlackRockDividend:
         div_yield_pct = div_yield * 100
         five_yr_avg = info.get("fiveYearAvgDividendYield")
 
-        if div_yield_pct > 5:
-            assessment = "高配当（持続性要確認）"
-        elif div_yield_pct > 3:
-            assessment = "良好な配当水準"
-        elif div_yield_pct > 1.5:
-            assessment = "中程度の配当"
-        elif div_yield_pct > 0:
-            assessment = "低配当（成長株の可能性）"
-        else:
-            assessment = "無配当"
+        assessment, _ = score_by_brackets(div_yield_pct, DIVIDEND_YIELD_BRACKETS)
 
         return {
             "current_yield_pct": round(div_yield_pct, 2),
@@ -123,12 +126,12 @@ class BlackRockDividend:
         else:
             cagr = 0
 
-        if consecutive >= 25:
-            status = "配当キング（25年以上連続増配）"
-        elif consecutive >= 10:
-            status = "配当アリストクラット候補（10年以上）"
-        elif consecutive >= 5:
-            status = "安定増配（5年以上）"
+        if consecutive >= DIVIDEND_KING_YEARS:
+            status = f"配当キング（{DIVIDEND_KING_YEARS}年以上連続増配）"
+        elif consecutive >= DIVIDEND_ARISTOCRAT_YEARS:
+            status = f"配当アリストクラット候補（{DIVIDEND_ARISTOCRAT_YEARS}年以上）"
+        elif consecutive >= DIVIDEND_STABLE_YEARS:
+            status = f"安定増配（{DIVIDEND_STABLE_YEARS}年以上）"
         else:
             status = "増配実績あり"
 
@@ -218,7 +221,7 @@ class BlackRockDividend:
 
         div_yield = info.get("dividendYield") or 0  # 小数形式（例: 0.03 = 3%）
 
-        price_growth = 0.05  # 年間5%の株価成長を想定
+        price_growth = DRIP_PRICE_GROWTH_ASSUMPTION
         div_growth = growth_analysis.get("cagr_pct", 3) / 100
 
         shares = investment_amount / current_price
@@ -285,19 +288,19 @@ class BlackRockDividend:
         is_trap = False
 
         div_yield = info.get("dividendYield", 0)
-        if div_yield is not None and div_yield > 0.06:
-            warnings.append("利回り6%超: 株価下落による見かけの高利回りの可能性")
+        if div_yield is not None and div_yield > YIELD_TRAP_YIELD_THRESHOLD:
+            warnings.append(f"利回り{YIELD_TRAP_YIELD_THRESHOLD*100:.0f}%超: 株価下落による見かけの高利回りの可能性")
             is_trap = True
 
         payout = info.get("payoutRatio")
-        if payout is not None and payout > 0.9:
-            warnings.append("配当性向90%超: 減配リスクが高い")
+        if payout is not None and payout > YIELD_TRAP_PAYOUT_THRESHOLD:
+            warnings.append(f"配当性向{YIELD_TRAP_PAYOUT_THRESHOLD*100:.0f}%超: 減配リスクが高い")
             is_trap = True
 
         if history is not None and not history.empty and len(history) > 60:
             close = history["Close"]
             price_change = (close.iloc[-1] / close.iloc[-60] - 1) * 100
-            if price_change < -20:
+            if price_change < YIELD_TRAP_PRICE_DROP_THRESHOLD:
                 warnings.append(f"直近60日で{price_change:.1f}%下落: 株価急落による見かけの高利回り")
                 is_trap = True
 

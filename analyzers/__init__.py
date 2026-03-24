@@ -1,5 +1,6 @@
 from .stock_data import StockDataFetcher
 from .stock_names import search_stocks, get_name_by_code
+from .base import BaseAnalyzer
 from .goldman_screener import GoldmanScreener
 from .morgan_technical import MorganTechnical
 from .bridgewater_risk import BridgewaterRisk
@@ -17,6 +18,7 @@ __all__ = [
     "StockDataFetcher",
     "search_stocks",
     "get_name_by_code",
+    "BaseAnalyzer",
     "GoldmanScreener",
     "MorganTechnical",
     "BridgewaterRisk",
