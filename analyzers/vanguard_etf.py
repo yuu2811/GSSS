@@ -117,28 +117,47 @@ class VanguardETF(BaseAnalyzer):
             "海外REIT": round(reit * 0.50, 1),
         }
 
+    # 詳細カテゴリ → RECOMMENDED_ETFS のグループ名マッピング
+    _CATEGORY_MAP = {
+        "日本株式": "日本株式",
+        "先進国株式": "先進国株式",
+        "新興国株式": "新興国株式",
+        "日本債券": "日本債券",
+        "外国債券": "外国債券",
+        "国内REIT": "REIT",
+        "海外REIT": "REIT",
+    }
+
     @staticmethod
     def _select_etfs(detailed, investment_amount):
         picks = []
         for category, pct in detailed.items():
             amount = investment_amount * pct / 100
+            group_name = VanguardETF._CATEGORY_MAP.get(category)
+            if group_name is None:
+                logger.warning("未知のカテゴリ: %s", category)
+                continue
 
-            # カテゴリに対応するETFを選択
-            for group_name, etfs in VanguardETF.RECOMMENDED_ETFS.items():
-                for etf in etfs:
-                    if category in etf["category"] or group_name == category:
-                        picks.append({
-                            "ticker": etf["ticker"],
-                            "name": etf["name"],
-                            "category": category,
-                            "allocation_pct": pct,
-                            "amount": round(amount, 0),
-                            "expense_ratio": etf["expense"],
-                        })
-                        break
-                else:
-                    continue
-                break
+            etfs = VanguardETF.RECOMMENDED_ETFS.get(group_name, [])
+            if not etfs:
+                continue
+
+            # REIT は国内/海外で使い分ける
+            if group_name == "REIT":
+                target_keyword = "国内" if "国内" in category else "先進国"
+                etf = next((e for e in etfs if target_keyword in e["category"]), etfs[0])
+            else:
+                # 最初のETF（最低コスト想定）を選択
+                etf = etfs[0]
+
+            picks.append({
+                "ticker": etf["ticker"],
+                "name": etf["name"],
+                "category": category,
+                "allocation_pct": pct,
+                "amount": round(amount, 0),
+                "expense_ratio": etf["expense"],
+            })
 
         return picks
 

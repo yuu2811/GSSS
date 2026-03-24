@@ -106,8 +106,22 @@ def mock_dividends():
 
 
 @pytest.fixture
+def mock_earnings_dates():
+    """Earnings dates DataFrame."""
+    dates = pd.to_datetime([
+        "2024-10-30", "2024-07-31", "2024-04-26", "2024-01-31",
+        "2023-10-30", "2023-07-28", "2023-04-28", "2023-01-31",
+    ])
+    return pd.DataFrame({
+        "EPS Estimate": [105, 100, 95, 90, 85, 80, 75, 70],
+        "Reported EPS": [110, 102, 98, 88, 90, 82, 73, 72],
+        "Surprise(%)": [4.8, 2.0, 3.2, -2.2, 5.9, 2.5, -2.7, 2.9],
+    }, index=dates)
+
+
+@pytest.fixture
 def mock_stock_data(mock_info, mock_history, mock_financials, mock_cashflow,
-                    mock_balance_sheet, mock_dividends):
+                    mock_balance_sheet, mock_dividends, mock_earnings_dates):
     """Complete StockData dict."""
     return {
         "ticker": "9999.T",
@@ -117,4 +131,5 @@ def mock_stock_data(mock_info, mock_history, mock_financials, mock_cashflow,
         "cashflow": mock_cashflow,
         "balance_sheet": mock_balance_sheet,
         "dividends": mock_dividends,
+        "earnings_dates": mock_earnings_dates,
     }

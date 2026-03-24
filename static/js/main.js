@@ -262,6 +262,28 @@ document.addEventListener('DOMContentLoaded', () => {
     tickerInput.addEventListener('input', (e) => {
         onSearchInput(e.target.value.trim());
     });
+
+    // ボタンイベント（inline onclick を排除）
+    const searchBtn = document.getElementById('searchBtn');
+    if (searchBtn) searchBtn.addEventListener('click', () => searchStock());
+
+    const shortcutsBtn = document.getElementById('shortcutsBtn');
+    if (shortcutsBtn) shortcutsBtn.addEventListener('click', () => showShortcutsModal());
+
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    if (closeModalBtn) closeModalBtn.addEventListener('click', () => hideShortcutsModal());
+
+    const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+    if (clearHistoryBtn) clearHistoryBtn.addEventListener('click', () => clearSearchHistory());
+
+    // モーダル背景クリックで閉じる
+    const shortcutsModal = document.getElementById('shortcutsModal');
+    if (shortcutsModal) {
+        shortcutsModal.addEventListener('click', (e) => {
+            if (e.target === shortcutsModal) hideShortcutsModal();
+        });
+    }
+
     // クリック外でサジェストを閉じる
     document.addEventListener('click', (e) => {
         if (!e.target.closest('#tickerInput') && !e.target.closest('#suggestionsContainer')) {

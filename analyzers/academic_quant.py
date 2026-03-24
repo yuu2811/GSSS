@@ -221,10 +221,11 @@ class AcademicQuant(BaseAnalyzer):
                     else:
                         score += 5
 
-                # Beta estimation
+                # Beta proxy (ボラティリティ比率による推定; 市場ボラ≈20%を仮定)
                 if len(returns) >= 120:
-                    mkt_vol = returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR)
-                    beta_est = min(max(mkt_vol / 0.20, 0.3), 2.5)
+                    stock_vol = returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR)
+                    assumed_market_vol = 0.20  # 日経平均の長期平均年率ボラ
+                    beta_est = min(max(stock_vol / assumed_market_vol, 0.3), 2.5)
                     if beta_est < 0.8:
                         score += 20
                         details.append(f"推定ベータ {beta_est:.2f} — 低ベータ")
