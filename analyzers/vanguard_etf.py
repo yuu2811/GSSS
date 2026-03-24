@@ -1,6 +1,15 @@
 """Vanguard スタイル ETFポートフォリオ構築"""
 
-class VanguardETF:
+from __future__ import annotations
+
+import logging
+
+from .base import BaseAnalyzer
+
+logger = logging.getLogger(__name__)
+
+
+class VanguardETF(BaseAnalyzer):
     """バンガード流のETFポートフォリオ構築"""
 
     NAME = "Vanguard ETFポートフォリオ"

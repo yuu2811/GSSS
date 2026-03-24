@@ -47,14 +47,27 @@ function renderSearchHistory() {
         return;
     }
     container.classList.remove('hidden');
-    chips.innerHTML = history.map(h => {
+    chips.innerHTML = '';
+    history.forEach(h => {
         const code = h.ticker.replace('.T', '');
         const label = h.name ? `${code} ${h.name.substring(0, 6)}` : code;
-        return `<div class="history-chip ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg flex items-center gap-1.5 cursor-pointer" onclick="quickTicker('${escapeHtml(code)}')">
-            <span>${escapeHtml(label)}</span>
-            <button class="close-btn text-gs-text-muted/40 hover:text-red-400 text-sm leading-none" onclick="event.stopPropagation();removeFromHistory('${escapeHtml(h.ticker)}')">&times;</button>
-        </div>`;
-    }).join('');
+
+        const chip = document.createElement('div');
+        chip.className = 'history-chip ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg flex items-center gap-1.5 cursor-pointer';
+        chip.addEventListener('click', () => quickTicker(code));
+
+        const span = document.createElement('span');
+        span.textContent = label;
+        chip.appendChild(span);
+
+        const btn = document.createElement('button');
+        btn.className = 'close-btn text-gs-text-muted/40 hover:text-red-400 text-sm leading-none';
+        btn.innerHTML = '&times;';
+        btn.addEventListener('click', (e) => { e.stopPropagation(); removeFromHistory(h.ticker); });
+        chip.appendChild(btn);
+
+        chips.appendChild(chip);
+    });
 }
 
 function quickTicker(code) {
@@ -163,14 +176,25 @@ function showSuggestions(results) {
         return;
     }
 
-    container.innerHTML = results.map((r, i) => {
+    container.innerHTML = '';
+    results.forEach((r) => {
         const code = (r.code || r.ticker || '').replace('.T', '');
-        return `<div class="suggestion-item px-4 py-2.5 cursor-pointer hover:bg-gs-accent/10 transition-colors border-b border-gs-border/30 last:border-b-0 flex items-center gap-3"
-                     onclick="selectSuggestion('${escapeHtml(code)}', '${escapeHtml(r.name)}')">
-            <span class="text-gs-accent font-mono text-sm font-semibold min-w-[3.5rem]">${escapeHtml(code)}</span>
-            <span class="text-white text-sm truncate">${escapeHtml(r.name)}</span>
-        </div>`;
-    }).join('');
+        const item = document.createElement('div');
+        item.className = 'suggestion-item px-4 py-2.5 cursor-pointer hover:bg-gs-accent/10 transition-colors border-b border-gs-border/30 last:border-b-0 flex items-center gap-3';
+        item.addEventListener('click', () => selectSuggestion(code, r.name));
+
+        const codeSpan = document.createElement('span');
+        codeSpan.className = 'text-gs-accent font-mono text-sm font-semibold min-w-[3.5rem]';
+        codeSpan.textContent = code;
+        item.appendChild(codeSpan);
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'text-white text-sm truncate';
+        nameSpan.textContent = r.name;
+        item.appendChild(nameSpan);
+
+        container.appendChild(item);
+    });
     container.classList.remove('hidden');
 }
 

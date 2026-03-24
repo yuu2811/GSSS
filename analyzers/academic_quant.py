@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
+
+from .base import BaseAnalyzer
+from .config import ACADEMIC_WEIGHTS, TRADING_DAYS_PER_YEAR
 from .stock_data import StockDataFetcher, StockData, AnalysisResult
 from .scoring import weighted_composite
 
+logger = logging.getLogger(__name__)
 
-class AcademicQuant:
+
+class AcademicQuant(BaseAnalyzer):
     """学術論文ベースのマルチファクター定量分析"""
 
     NAME = "Academic Paper 定量分析"
@@ -186,7 +193,7 @@ class AcademicQuant:
             returns = close.pct_change().dropna()
 
             if len(returns) >= 60:
-                vol = returns.std() * np.sqrt(252) * 100
+                vol = returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR) * 100
                 if vol < 20:
                     score += 40
                     details.append(f"年率ボラティリティ {vol:.1f}% — 低ボラ（アノマリー有利）")
@@ -204,7 +211,7 @@ class AcademicQuant:
                 # Downside deviation
                 neg_ret = returns[returns < 0]
                 if len(neg_ret) > 10:
-                    dd = neg_ret.std() * np.sqrt(252) * 100
+                    dd = neg_ret.std() * np.sqrt(TRADING_DAYS_PER_YEAR) * 100
                     details.append(f"下方偏差 {dd:.1f}%")
                     metrics["下方偏差"] = f"{dd:.1f}%"
                     if dd < 15:
@@ -216,7 +223,7 @@ class AcademicQuant:
 
                 # Beta estimation
                 if len(returns) >= 120:
-                    mkt_vol = returns.std() * np.sqrt(252)
+                    mkt_vol = returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR)
                     beta_est = min(max(mkt_vol / 0.20, 0.3), 2.5)
                     if beta_est < 0.8:
                         score += 20
@@ -455,8 +462,8 @@ class AcademicQuant:
                 rets = close.pct_change().dropna()
 
                 # Realized vol
-                rv_30 = rets.tail(30).std() * np.sqrt(252) * 100
-                rv_90 = rets.tail(min(90, len(rets))).std() * np.sqrt(252) * 100
+                rv_30 = rets.tail(30).std() * np.sqrt(TRADING_DAYS_PER_YEAR) * 100
+                rv_90 = rets.tail(min(90, len(rets))).std() * np.sqrt(TRADING_DAYS_PER_YEAR) * 100
                 metrics["30日実現ボラ"] = f"{rv_30:.1f}%"
                 metrics["90日実現ボラ"] = f"{rv_90:.1f}%"
 
@@ -691,8 +698,8 @@ class AcademicQuant:
             returns = close.pct_change().dropna()
 
             if len(returns) >= 60:
-                vol = returns.std() * np.sqrt(252) * 100
-                sharpe_est = (returns.mean() * 252) / (returns.std() * np.sqrt(252)) if returns.std() > 0 else 0
+                vol = returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR) * 100
+                sharpe_est = (returns.mean() * TRADING_DAYS_PER_YEAR) / (returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR)) if returns.std() > 0 else 0
                 metrics["年率ボラ"] = f"{vol:.1f}%"
                 metrics["推定シャープ"] = f"{sharpe_est:.2f}"
 
@@ -740,7 +747,7 @@ class AcademicQuant:
                 # Sortino
                 neg = returns[returns < 0]
                 if len(neg) > 0:
-                    sortino = (returns.mean() * 252) / (neg.std() * np.sqrt(252)) if neg.std() > 0 else 0
+                    sortino = (returns.mean() * TRADING_DAYS_PER_YEAR) / (neg.std() * np.sqrt(TRADING_DAYS_PER_YEAR)) if neg.std() > 0 else 0
                     metrics["ソルティノ比率"] = f"{sortino:.2f}"
 
         return {"score": min(score, 100), "details": details, "metrics": metrics}
@@ -748,19 +755,7 @@ class AcademicQuant:
     # ── Composite ────────────────────────────────────────
     @staticmethod
     def _composite(ff, mom, lv, qmj, dv, mr, vf, pt, ped, aa, rp):
-        weights = {
-            "Fama-French": 0.15,
-            "モメンタム": 0.12,
-            "低ボラティリティ": 0.10,
-            "QMJ": 0.12,
-            "ディープバリュー": 0.10,
-            "平均回帰": 0.08,
-            "ボラティリティ予測": 0.08,
-            "ペアトレーディング": 0.05,
-            "決算ドリフト": 0.08,
-            "アクルーアル": 0.07,
-            "リスクパリティ": 0.05,
-        }
+        weights = ACADEMIC_WEIGHTS
 
         scores = {
             "Fama-French": ff["score"],

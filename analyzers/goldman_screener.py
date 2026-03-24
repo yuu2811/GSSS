@@ -2,61 +2,49 @@
 
 from __future__ import annotations
 
+import logging
+
+from .base import BaseAnalyzer
+from .config import PE_BRACKETS, DE_BRACKETS, PAYOUT_RATIO_BRACKETS, score_by_brackets
 from .stock_data import StockDataFetcher, StockData, AnalysisResult
 
+logger = logging.getLogger(__name__)
 
-class GoldmanScreener:
+
+class GoldmanScreener(BaseAnalyzer):
     """ゴールドマン・サックス流の株式スクリーニングフレームワーク"""
 
     NAME = "Goldman Sachs 株式スクリーナー"
     DESCRIPTION = "P/E比率、収益成長、負債比率、配当利回り、競争優位性を総合的に分析"
 
     @staticmethod
-    def analyze(stock_data: StockData) -> AnalysisResult:
-        info = stock_data.get("info", {})
+    def analyze(stock_data: StockData, **kwargs) -> AnalysisResult:
+        header = BaseAnalyzer.extract_header(stock_data)
+        info = header["info"]
         history = stock_data.get("history")
         financials = stock_data.get("financials")
         balance_sheet = stock_data.get("balance_sheet")
 
-        ticker = stock_data.get("ticker", "N/A")
-        company_name = StockDataFetcher.get_display_name(info, ticker)
-        current_price = StockDataFetcher.get_current_price(info)
-        sector = info.get("sector", "不明")
-        industry = info.get("industry", "不明")
+        current_price = header["current_price"]
 
-        # P/E比率分析
         pe_ratio = info.get("trailingPE") or info.get("forwardPE")
         forward_pe = info.get("forwardPE")
-        sector_pe = info.get("sectorPE", None)
-        pe_analysis = GoldmanScreener._analyze_pe(pe_ratio, forward_pe, sector)
 
-        # 収益成長トレンド
+        pe_analysis = GoldmanScreener._analyze_pe(pe_ratio, forward_pe)
         revenue_growth = GoldmanScreener._analyze_revenue_growth(financials)
-
-        # 負債比率分析
         debt_analysis = GoldmanScreener._analyze_debt(info, balance_sheet)
-
-        # 配当分析
         dividend_analysis = GoldmanScreener._analyze_dividend(info)
-
-        # 競争優位性（モート）評価
         moat_rating = GoldmanScreener._rate_moat(info, revenue_growth, debt_analysis)
-
-        # 価格ターゲット
-        price_targets = GoldmanScreener._calculate_targets(current_price, pe_ratio, info)
-
-        # リスク評価
+        price_targets = GoldmanScreener._calculate_targets(current_price, info)
         risk_rating = GoldmanScreener._calculate_risk(info, debt_analysis, pe_analysis)
-
-        # エントリーゾーン
         entry_zones = GoldmanScreener._calculate_entry_zones(current_price, history)
 
         return {
             "analyzer": GoldmanScreener.NAME,
-            "company_name": company_name,
-            "ticker": ticker,
-            "sector": sector,
-            "industry": industry,
+            "company_name": header["company_name"],
+            "ticker": header["ticker"],
+            "sector": header["sector"],
+            "industry": header["industry"],
             "current_price": current_price,
             "currency": info.get("currency", "JPY"),
             "pe_analysis": pe_analysis,
@@ -69,33 +57,18 @@ class GoldmanScreener:
             "entry_zones": entry_zones,
             "market_cap": info.get("marketCap", 0),
             "summary": GoldmanScreener._generate_summary(
-                company_name, moat_rating, risk_rating, price_targets
+                header["company_name"], moat_rating, risk_rating, price_targets
             ),
         }
 
     @staticmethod
-    def _analyze_pe(pe_ratio, forward_pe, sector):
+    def _analyze_pe(pe_ratio, forward_pe):
         if pe_ratio is None:
             return {"current_pe": None, "forward_pe": forward_pe, "assessment": "データなし", "score": 5}
 
-        if pe_ratio < 10:
-            assessment = "割安（バリュー圏）"
-            score = 9
-        elif pe_ratio < 15:
-            assessment = "適正～やや割安"
-            score = 7
-        elif pe_ratio < 20:
-            assessment = "適正水準"
-            score = 5
-        elif pe_ratio < 30:
-            assessment = "やや割高"
-            score = 3
-        else:
-            assessment = "割高（成長期待込み）"
-            score = 2
-
+        assessment, score = score_by_brackets(pe_ratio, PE_BRACKETS)
         return {
-            "current_pe": round(pe_ratio, 2) if pe_ratio else None,
+            "current_pe": round(pe_ratio, 2),
             "forward_pe": round(forward_pe, 2) if forward_pe else None,
             "assessment": assessment,
             "score": score,
@@ -107,11 +80,10 @@ class GoldmanScreener:
             return {"years": [], "growth_rates": [], "trend": "データなし"}
 
         try:
-            if "Total Revenue" in financials.index:
-                revenues = financials.loc["Total Revenue"].dropna().sort_index()
-            else:
+            if "Total Revenue" not in financials.index:
                 return {"years": [], "growth_rates": [], "trend": "データなし"}
 
+            revenues = financials.loc["Total Revenue"].dropna().sort_index()
             years = []
             growth_rates = []
             rev_values = revenues.values
@@ -127,7 +99,9 @@ class GoldmanScreener:
                 trend = "データ不足"
             elif all(g > 0 for g in growth_rates):
                 trend = "安定成長"
-            elif (growth_rates[-1] > growth_rates[0]) if len(growth_rates) > 1 else (growth_rates[-1] > 0):
+            elif len(growth_rates) > 1 and growth_rates[-1] > growth_rates[0]:
+                trend = "加速成長"
+            elif growth_rates[-1] > 0:
                 trend = "加速成長"
             elif all(g < 0 for g in growth_rates):
                 trend = "減収傾向"
@@ -141,6 +115,7 @@ class GoldmanScreener:
                 "revenues": [float(r) for r in rev_values],
             }
         except Exception:
+            logger.debug("収益成長分析に失敗", exc_info=True)
             return {"years": [], "growth_rates": [], "trend": "計算エラー"}
 
     @staticmethod
@@ -149,24 +124,7 @@ class GoldmanScreener:
         total_debt = info.get("totalDebt", 0)
         total_cash = info.get("totalCash", 0)
 
-        if de_ratio is None:
-            health = "データなし"
-            score = 5
-        elif de_ratio < 0.3:
-            health = "非常に健全"
-            score = 10
-        elif de_ratio < 0.5:
-            health = "健全"
-            score = 8
-        elif de_ratio < 1.0:
-            health = "標準的"
-            score = 6
-        elif de_ratio < 2.0:
-            health = "やや高い"
-            score = 4
-        else:
-            health = "高リスク"
-            score = 2
+        health, score = score_by_brackets(de_ratio, DE_BRACKETS)
 
         return {
             "debt_to_equity": round(de_ratio, 2) if de_ratio is not None else None,
@@ -183,25 +141,11 @@ class GoldmanScreener:
         div_rate = info.get("dividendRate")
         payout_ratio = info.get("payoutRatio")
 
-        if div_yield is not None:
-            div_yield_pct = div_yield * 100
-        else:
-            div_yield_pct = 0
+        div_yield_pct = (div_yield * 100) if div_yield is not None else 0
 
         if payout_ratio is not None:
             payout_pct = payout_ratio * 100
-            if payout_pct < 40:
-                sustainability = "非常に持続可能"
-                score = 10
-            elif payout_pct < 60:
-                sustainability = "持続可能"
-                score = 8
-            elif payout_pct < 80:
-                sustainability = "やや高め"
-                score = 5
-            else:
-                sustainability = "要注意"
-                score = 3
+            sustainability, score = score_by_brackets(payout_pct, PAYOUT_RATIO_BRACKETS)
         else:
             sustainability = "データなし"
             score = 5
@@ -220,9 +164,8 @@ class GoldmanScreener:
         score = 0
         reasons = []
 
-        # 時価総額
         market_cap = info.get("marketCap", 0)
-        if market_cap and market_cap > 1e12:  # 1兆円以上
+        if market_cap and market_cap > 1e12:
             score += 3
             reasons.append("大型株（時価総額1兆円超）")
         elif market_cap and market_cap > 1e11:
@@ -231,7 +174,6 @@ class GoldmanScreener:
         elif market_cap and market_cap > 1e10:
             score += 1
 
-        # 利益率
         profit_margin = info.get("profitMargins")
         if profit_margin and profit_margin > 0.20:
             score += 3
@@ -242,7 +184,6 @@ class GoldmanScreener:
         elif profit_margin and profit_margin > 0:
             score += 1
 
-        # ROE
         roe = info.get("returnOnEquity")
         if roe and roe > 0.15:
             score += 2
@@ -250,12 +191,10 @@ class GoldmanScreener:
         elif roe and roe > 0.10:
             score += 1
 
-        # 収益成長
         if revenue_growth.get("trend") in ["安定成長", "加速成長"]:
             score += 2
             reasons.append("安定した収益成長")
 
-        # 負債
         if debt_analysis.get("score", 5) >= 8:
             score += 1
             reasons.append("低負債")
@@ -270,7 +209,7 @@ class GoldmanScreener:
         return {"rating": rating, "score": score, "max_score": 11, "reasons": reasons}
 
     @staticmethod
-    def _calculate_targets(current_price, pe_ratio, info):
+    def _calculate_targets(current_price, info):
         if not current_price or current_price == 0:
             return {"bull_target": None, "bear_target": None, "base_target": None}
 
@@ -288,11 +227,9 @@ class GoldmanScreener:
             }
 
         # アナリスト目標がない場合は推定
-        bull = current_price * 1.20
-        bear = current_price * 0.85
         return {
-            "bull_target": round(bull, 0),
-            "bear_target": round(bear, 0),
+            "bull_target": round(current_price * 1.20, 0),
+            "bear_target": round(current_price * 0.85, 0),
             "base_target": round(current_price * 1.05, 0),
             "upside_pct": 20.0,
             "downside_pct": -15.0,

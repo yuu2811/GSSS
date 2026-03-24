@@ -2,12 +2,24 @@
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 import pandas as pd
+
+from .base import BaseAnalyzer
+from .config import (
+    TRADING_DAYS_PER_YEAR, VOLATILITY_ANNUAL_BRACKETS, BETA_BRACKETS,
+    LIQUIDITY_VOLUME_BRACKETS, STRESS_SCENARIOS,
+    HIGH_RATE_SENSITIVITY_SECTORS, MODERATE_RATE_SENSITIVITY_SECTORS,
+    score_by_brackets,
+)
 from .stock_data import StockDataFetcher, StockData, AnalysisResult
 
+logger = logging.getLogger(__name__)
 
-class BridgewaterRisk:
+
+class BridgewaterRisk(BaseAnalyzer):
     """ブリッジウォーター流のリスク評価"""
 
     NAME = "Bridgewater リスク評価"
@@ -80,16 +92,9 @@ class BridgewaterRisk:
     @staticmethod
     def _volatility_profile(returns):
         daily_vol = returns.std()
-        annual_vol = daily_vol * np.sqrt(252)
+        annual_vol = daily_vol * np.sqrt(TRADING_DAYS_PER_YEAR)
 
-        if annual_vol > 0.40:
-            level = "非常に高い"
-        elif annual_vol > 0.25:
-            level = "高い"
-        elif annual_vol > 0.15:
-            level = "中程度"
-        else:
-            level = "低い"
+        level, _ = score_by_brackets(annual_vol, VOLATILITY_ANNUAL_BRACKETS)
 
         return {
             "daily_pct": round(daily_vol * 100, 2),
@@ -123,14 +128,7 @@ class BridgewaterRisk:
         up_beta = sr[up_mask].cov(mr[up_mask]) / mr[up_mask].var() if mr[up_mask].var() > 0 else beta
         down_beta = sr[down_mask].cov(mr[down_mask]) / mr[down_mask].var() if mr[down_mask].var() > 0 else beta
 
-        if beta > 1.5:
-            interp = "非常にアグレッシブ（市場以上に変動）"
-        elif beta > 1.0:
-            interp = "やや攻撃的（市場より変動大）"
-        elif beta > 0.7:
-            interp = "市場並み"
-        else:
-            interp = "ディフェンシブ（市場より変動小）"
+        interp, _ = score_by_brackets(beta, BETA_BRACKETS)
 
         return {
             "beta": round(beta, 2),
@@ -174,14 +172,10 @@ class BridgewaterRisk:
         sector = info.get("sector", "")
         industry = info.get("industry", "")
 
-        high_sensitivity = ["Real Estate", "Utilities", "Financial Services", "Banks"]
-        moderate_sensitivity = ["Technology", "Consumer Cyclical", "Industrials"]
-        low_sensitivity = ["Healthcare", "Consumer Defensive", "Energy"]
-
-        if any(s in sector or s in industry for s in high_sensitivity):
+        if any(s in sector or s in industry for s in HIGH_RATE_SENSITIVITY_SECTORS):
             level = "高感応度"
             impact = "金利上昇時に株価下落リスクが高い"
-        elif any(s in sector or s in industry for s in moderate_sensitivity):
+        elif any(s in sector or s in industry for s in MODERATE_RATE_SENSITIVITY_SECTORS):
             level = "中程度"
             impact = "金利変動の影響は限定的"
         else:
@@ -193,29 +187,22 @@ class BridgewaterRisk:
     @staticmethod
     def _stress_test(close, returns, _info=None):
         current = close.iloc[-1]
-        annual_vol = returns.std() * np.sqrt(252)
+        annual_vol = returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR)
 
-        scenarios = {
-            "リーマンショック級 (-50%)": {
-                "estimated_price": round(current * 0.50, 0),
-                "loss_pct": -50.0,
-            },
-            "コロナショック級 (-30%)": {
-                "estimated_price": round(current * 0.70, 0),
-                "loss_pct": -30.0,
-            },
-            "通常調整 (-15%)": {
-                "estimated_price": round(current * 0.85, 0),
-                "loss_pct": -15.0,
-            },
-            "2σイベント": {
-                "estimated_price": round(current * (1 - 2 * annual_vol), 0),
-                "loss_pct": round(-2 * annual_vol * 100, 1),
-            },
-            "3σイベント": {
-                "estimated_price": round(current * (1 - 3 * annual_vol), 0),
-                "loss_pct": round(-3 * annual_vol * 100, 1),
-            },
+        scenarios = {}
+        for name, drop in STRESS_SCENARIOS.items():
+            scenarios[name] = {
+                "estimated_price": round(current * (1 + drop), 0),
+                "loss_pct": round(drop * 100, 1),
+            }
+
+        scenarios["2σイベント"] = {
+            "estimated_price": round(current * (1 - 2 * annual_vol), 0),
+            "loss_pct": round(-2 * annual_vol * 100, 1),
+        }
+        scenarios["3σイベント"] = {
+            "estimated_price": round(current * (1 - 3 * annual_vol), 0),
+            "loss_pct": round(-3 * annual_vol * 100, 1),
         }
 
         return {"current_price": round(current, 0), "scenarios": scenarios}

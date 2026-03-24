@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import logging
+
+from .base import BaseAnalyzer
+from .config import RENAISSANCE_WEIGHTS
 from .stock_data import StockDataFetcher, StockData, AnalysisResult
 from .scoring import weighted_composite
 
+logger = logging.getLogger(__name__)
 
-class RenaissanceQuant:
+
+class RenaissanceQuant(BaseAnalyzer):
     """ルネッサンス・テクノロジーズ流のマルチファクタースクリーニング"""
 
     NAME = "Renaissance Technologies 定量スクリーナー"
@@ -335,13 +341,7 @@ class RenaissanceQuant:
 
     @staticmethod
     def _composite_score(value, quality, momentum, growth, sentiment):
-        weights = {
-            "バリュー": 0.20,
-            "クオリティ": 0.25,
-            "モメンタム": 0.20,
-            "成長": 0.20,
-            "センチメント": 0.15,
-        }
+        weights = RENAISSANCE_WEIGHTS
 
         scores = {
             "バリュー": value["score"],

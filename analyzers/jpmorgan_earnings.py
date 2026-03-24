@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import logging
+
 import pandas as pd
+
+from .base import BaseAnalyzer
 from .stock_data import StockDataFetcher, StockData, AnalysisResult
 
+logger = logging.getLogger(__name__)
 
-class JPMorganEarnings:
+
+class JPMorganEarnings(BaseAnalyzer):
     """JPモルガン流の決算分析"""
 
     NAME = "JPMorgan 決算アナライザー"

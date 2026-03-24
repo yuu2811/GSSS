@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import logging
+
+from .base import BaseAnalyzer
+from .config import RSI_OVERBOUGHT, RSI_OVERSOLD, RSI_OVERBOUGHT_MILD, RSI_OVERSOLD_MILD, BB_SQUEEZE_THRESHOLD
 from .stock_data import StockDataFetcher, StockData, AnalysisResult
 
+logger = logging.getLogger(__name__)
 
-class MorganTechnical:
+
+class MorganTechnical(BaseAnalyzer):
     """モルガン・スタンレー流のテクニカル分析ダッシュボード"""
 
     NAME = "Morgan Stanley テクニカル分析"
@@ -185,16 +191,16 @@ class MorganTechnical:
             return {"value": None, "interpretation": "データなし"}
 
         rsi = round(rsi, 1)
-        if rsi > 70:
+        if rsi > RSI_OVERBOUGHT:
             interpretation = "買われすぎ（売りシグナル）"
             signal = "売り"
-        elif rsi > 60:
+        elif rsi > RSI_OVERBOUGHT_MILD:
             interpretation = "やや買われすぎ"
             signal = "注意"
-        elif rsi < 30:
+        elif rsi < RSI_OVERSOLD:
             interpretation = "売られすぎ（買いシグナル）"
             signal = "買い"
-        elif rsi < 40:
+        elif rsi < RSI_OVERSOLD_MILD:
             interpretation = "やや売られすぎ"
             signal = "注目"
         else:
@@ -252,7 +258,7 @@ class MorganTechnical:
         else:
             position = "下限バンド割れ（売られすぎ）"
 
-        squeeze = "スクイーズ（収縮）" if width and width < 5 else "拡張"
+        squeeze = "スクイーズ（収縮）" if width and width < BB_SQUEEZE_THRESHOLD else "拡張"
 
         return {
             "upper": round(upper, 0),
