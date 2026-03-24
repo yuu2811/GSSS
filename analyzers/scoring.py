@@ -1,8 +1,13 @@
 """共通スコアリングユーティリティ — 複数のアナライザーで共有される計算ロジック"""
 
+from __future__ import annotations
+
+from typing import Any
 
 # レーティング閾値のデフォルト（スコア降順）
-DEFAULT_RATING_THRESHOLDS = [
+RatingThreshold = tuple[float, str, str]
+
+DEFAULT_RATING_THRESHOLDS: list[RatingThreshold] = [
     (70, "非常に魅力的", "強い買い推奨"),
     (55, "魅力的", "買い推奨"),
     (40, "中立", "保持/様子見"),
@@ -11,8 +16,11 @@ DEFAULT_RATING_THRESHOLDS = [
 ]
 
 
-def weighted_composite(scores: dict, weights: dict,
-                       thresholds=None) -> dict:
+def weighted_composite(
+    scores: dict[str, float],
+    weights: dict[str, float],
+    thresholds: list[RatingThreshold] | None = None,
+) -> dict[str, Any]:
     """重み付け複合スコアを計算し、レーティングと推奨を返す。
 
     Args:

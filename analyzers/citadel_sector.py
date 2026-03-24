@@ -149,6 +149,7 @@ class CitadelSector(BaseAnalyzer):
                 "avoid_sectors": avoid,
             }
         except Exception:
+            logger.warning("経済サイクル判定に失敗", exc_info=True)
             return {"phase": "判定不可", "description": "市場データ取得エラー"}
 
     @staticmethod

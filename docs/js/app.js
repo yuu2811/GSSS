@@ -65,14 +65,27 @@ function renderSearchHistory() {
         return;
     }
     container.classList.remove('hidden');
-    chips.innerHTML = history.map(h => {
+    chips.innerHTML = '';
+    history.forEach(h => {
         const code = h.ticker.replace('.T', '');
         const label = h.name ? `${code} ${h.name.substring(0, 6)}` : code;
-        return `<div class="history-chip ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg flex items-center gap-1.5 cursor-pointer" onclick="quickTicker('${esc(code)}')">
-            <span>${esc(label)}</span>
-            <button class="close-btn text-gs-text-muted/40 hover:text-red-400 text-sm leading-none" onclick="event.stopPropagation();removeFromHistory('${esc(h.ticker)}')">&times;</button>
-        </div>`;
-    }).join('');
+
+        const chip = document.createElement('div');
+        chip.className = 'history-chip ticker-chip text-xs bg-gs-darker/80 text-gs-text-muted px-2.5 py-1 rounded-lg flex items-center gap-1.5 cursor-pointer';
+        chip.addEventListener('click', () => quickTicker(code));
+
+        const span = document.createElement('span');
+        span.textContent = label;
+        chip.appendChild(span);
+
+        const btn = document.createElement('button');
+        btn.className = 'close-btn text-gs-text-muted/40 hover:text-red-400 text-sm leading-none';
+        btn.innerHTML = '&times;';
+        btn.addEventListener('click', (e) => { e.stopPropagation(); removeFromHistory(h.ticker); });
+        chip.appendChild(btn);
+
+        chips.appendChild(chip);
+    });
 }
 
 // ══════════════════════════════════════════════════════
